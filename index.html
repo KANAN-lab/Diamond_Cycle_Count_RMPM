@@ -57,23 +57,28 @@
           <i class="fa-solid fa-file-import"></i>
           <span>Import SAP</span>
         </button>
+        <!-- Admin Settings (Only visible to ADMIN role) -->
+        <button class="nav-link-btn" data-target="view-settings" id="tab-nav-settings" style="display: none;">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Pengaturan Admin</span>
+        </button>
       </nav>
 
-      <!-- Right Action Controls (Theme, Supabase Status, User) -->
+      <!-- Right Action Controls (Theme, Cloud Status, User Profile, Logout) -->
       <div class="navbar-controls">
         <!-- Theme Switcher (Light / Dark) -->
         <button id="btn-theme-toggle" class="theme-toggle-btn" title="Ganti Tema (Light / Dark)">
           <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
         </button>
 
-        <!-- Supabase Realtime Status Pill -->
-        <button id="btn-supabase-status" class="pill-status-btn" title="Koneksi Realtime Database Supabase">
+        <!-- Cloud Realtime Status Indicator (Silent & Backend-Connected) -->
+        <div class="pill-status-btn" style="cursor: default;" title="Sinkronisasi Cloud Realtime Otomatis">
           <i class="fa-solid fa-circle" id="sb-status-dot" style="font-size: 8px; color: var(--brand-primary);"></i>
           <span id="sb-status-text">Cloud Sync</span>
-        </button>
+        </div>
 
         <!-- User Profile Switcher -->
-        <div class="user-account-chip" id="btn-open-user-modal" title="Klik untuk Ganti Akun Pengguna">
+        <div class="user-account-chip" id="btn-open-user-modal" title="Klik untuk Informasi Akun">
           <div class="user-chip-avatar" id="user-avatar-initial">A</div>
           <div style="display: flex; flex-direction: column; line-height: 1.1;">
             <span class="user-chip-name" id="current-user-name">Asep</span>
@@ -81,6 +86,12 @@
           </div>
           <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem; color: var(--text-muted); margin-left: 2px;"></i>
         </div>
+
+        <!-- Logout Button -->
+        <button id="btn-logout" class="btn-core btn-secondary btn-sm" title="Keluar dari Sesi Kerja">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span style="display: none;" class="desktop-only-text">Keluar</span>
+        </button>
       </div>
     </div>
   </header>
@@ -102,7 +113,7 @@
             <span class="kpi-tile-number" id="dash-ira-rate" style="color: var(--brand-primary);">80.0%</span>
             <span class="kpi-tile-meta" id="dash-ira-count">(16 Cocok)</span>
           </div>
-          <span class="kpi-tile-meta">Target Standar Audit: &ge; 98.0%</span>
+          <span class="kpi-tile-meta" id="dash-ira-benchmark">Target Standar Audit: &ge; 98.0%</span>
         </div>
 
         <div class="kpi-tile glow-danger">
@@ -145,7 +156,7 @@
         <div class="chart-card">
           <div class="chart-card-header">
             <div class="chart-card-title">
-              <i class="fa-solid fa-chart-donut" style="color: var(--brand-primary);"></i>
+              <i class="fa-solid fa-chart-pie" style="color: var(--brand-primary);"></i>
               <span>Proporsi Akurasi Fisik (IRA Index)</span>
             </div>
             <span class="chart-card-subtitle">Cocok vs Selisih</span>
@@ -195,7 +206,7 @@
             <i class="fa-solid fa-file-excel" style="color: #16a34a;"></i>
             <span>Export CSV</span>
           </button>
-          <button class="btn-core btn-secondary" id="btn-dash-reset" title="Kembalikan ke data 20 baris lembar fisik">
+          <button class="btn-core btn-secondary admin-only-btn" id="btn-dash-reset" title="Kembalikan ke data 20 baris lembar fisik">
             <i class="fa-solid fa-arrows-rotate"></i>
             <span>Reset Contoh</span>
           </button>
@@ -367,7 +378,7 @@
       <div class="table-toolbar" style="margin-bottom: 1.5rem;">
         <div>
           <strong style="color: var(--text-main); font-size: 1rem;">Dokumen Berita Acara Rekonsiliasi Cycle Count</strong>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">Format resmi A4 Landscape dengan matriks 4 tanda tangan (Checker, SPV, Inventory Control, Accounting).</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">Format resmi A4 Landscape dengan matriks 4 tanda tangan dinamis (dapat dikustomisasi oleh Administrator).</p>
         </div>
         <button class="btn-core btn-primary" onclick="window.print()">
           <i class="fa-solid fa-print"></i>
@@ -378,12 +389,12 @@
       <div class="print-document-sheet">
         <div class="doc-header">
           <div>
-            <div class="doc-company-title">PT INDUSTRI PANGAN NUSANTARA</div>
-            <div style="font-size: 8.5pt; color: #444;">Warehouse & Supply Chain Division &bull; RMPM Department</div>
+            <div class="doc-company-title" id="doc-company-name">PT INDUSTRI PANGAN NUSANTARA</div>
+            <div style="font-size: 8.5pt; color: #444;" id="doc-division-name">Warehouse & Supply Chain Division &bull; RMPM Department</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt;">
-            <div><strong>No. Dokumen:</strong> BA-CC-RMPM/2026/09/21-01</div>
-            <div><strong>Jadwal:</strong> 21-Sep-2026 &bull; <strong>SPV:</strong> SPV ASEP</div>
+            <div><strong>No. Dokumen:</strong> <span id="doc-no-text">BA-CC-RMPM/2026/09/21-01</span></div>
+            <div><strong>Jadwal:</strong> <span id="doc-date-text">21-Sep-2026</span> &bull; <strong>SPV:</strong> <span id="doc-spv-text">SPV ASEP</span></div>
           </div>
         </div>
 
@@ -410,37 +421,49 @@
             </tr>
           </thead>
           <tbody id="printout-tbody">
-            <!-- Rendered by JS -->
+            <!-- Rendered by JS from OOP Models -->
           </tbody>
         </table>
 
-        <!-- Signatures Grid -->
+        <!-- Dynamic Signatures Grid (100% Zero Hardcode, Customizable by Admin) -->
         <div class="doc-signatures-grid">
           <div class="sig-col">
-            <div class="sig-title">Dihitung Oleh (Checker)</div>
+            <div class="sig-title" id="sig-checker-title">Dihitung Oleh (Checker)</div>
             <div class="sig-space"></div>
-            <div class="sig-name">BUDI SANTOSO<br><span style="font-size: 7.5pt; color: #555;">Petugas Cycle Count</span></div>
+            <div class="sig-name">
+              <span id="sig-checker-name">BUDI SANTOSO</span><br>
+              <span style="font-size: 7.5pt; color: #555;" id="sig-checker-position">Petugas Cycle Count</span>
+            </div>
           </div>
           <div class="sig-col">
-            <div class="sig-title">Diperiksa Oleh (SPV RMPM)</div>
+            <div class="sig-title" id="sig-supervisor-title">Diperiksa Oleh (SPV RMPM)</div>
             <div class="sig-space"></div>
-            <div class="sig-name">ASEP SAEPULLAH<br><span style="font-size: 7.5pt; color: #555;">Supervisor Warehouse</span></div>
+            <div class="sig-name">
+              <span id="sig-supervisor-name">ASEP SAEPULLAH</span><br>
+              <span style="font-size: 7.5pt; color: #555;" id="sig-supervisor-position">Supervisor Warehouse</span>
+            </div>
           </div>
           <div class="sig-col">
-            <div class="sig-title">Diverifikasi (Inventory Control)</div>
+            <div class="sig-title" id="sig-controller-title">Diverifikasi (Inventory Control)</div>
             <div class="sig-space"></div>
-            <div class="sig-name">HENDRA WIJAYA<br><span style="font-size: 7.5pt; color: #555;">Inventory Controller</span></div>
+            <div class="sig-name">
+              <span id="sig-controller-name">HENDRA WIJAYA</span><br>
+              <span style="font-size: 7.5pt; color: #555;" id="sig-controller-position">Inventory Controller</span>
+            </div>
           </div>
           <div class="sig-col">
-            <div class="sig-title">Disetujui Oleh (Accounting)</div>
+            <div class="sig-title" id="sig-accounting-title">Disetujui Oleh (Accounting)</div>
             <div class="sig-space"></div>
-            <div class="sig-name">SITI RAHAYU, SE.<br><span style="font-size: 7.5pt; color: #555;">Cost & Inventory Accounting</span></div>
+            <div class="sig-name">
+              <span id="sig-accounting-name">SITI RAHAYU, SE.</span><br>
+              <span style="font-size: 7.5pt; color: #555;" id="sig-accounting-position">Cost & Inventory Accounting</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ================= VIEW 4: IMPORT DATA SAP ================= -->
+    <!-- ================= VIEW 4: IMPORT DATA SAP (ADMIN ONLY) ================= -->
     <section class="view-section" id="view-import">
       <div class="kpi-tile" style="max-width: 800px; margin: 0 auto;">
         <h3 style="font-size: 1.15rem; color: var(--text-main); margin-bottom: 0.35rem;">
@@ -460,6 +483,128 @@
       </div>
     </section>
 
+    <!-- ================= VIEW 5: PENGATURAN ADMINISTRATOR (CUSTOMIZATION TTD & MASTER DATA) ================= -->
+    <section class="view-section" id="view-settings">
+      <div class="admin-settings-deck">
+        
+        <!-- Card 1: Customization Tanda Tangan Berita Acara -->
+        <div class="settings-card">
+          <div class="settings-card-head">
+            <div class="settings-card-title">
+              <i class="fa-solid fa-signature" style="color: var(--brand-primary);"></i>
+              <span>Kustomisasi Tanda Tangan (TTD) Berita Acara</span>
+            </div>
+            <div class="settings-card-desc">Atur nama dan jabatan pejabat penandatangan resmi tanpa hardcode.</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Checker -->
+            <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
+              <span class="role-badge role-checker" style="margin-bottom: 0.5rem; display: inline-block;">1. Petugas Hitung (Checker)</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                <div class="form-group">
+                  <label class="form-label">Nama Lengkap:</label>
+                  <input type="text" id="cfg-sig-checker-name" class="app-input" placeholder="BUDI SANTOSO">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Jabatan:</label>
+                  <input type="text" id="cfg-sig-checker-pos" class="app-input" placeholder="Petugas Cycle Count">
+                </div>
+              </div>
+            </div>
+
+            <!-- Supervisor -->
+            <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
+              <span class="role-badge role-admin" style="margin-bottom: 0.5rem; display: inline-block;">2. Supervisor Warehouse (SPV)</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                <div class="form-group">
+                  <label class="form-label">Nama Lengkap:</label>
+                  <input type="text" id="cfg-sig-spv-name" class="app-input" placeholder="ASEP SAEPULLAH">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Jabatan:</label>
+                  <input type="text" id="cfg-sig-spv-pos" class="app-input" placeholder="Supervisor Warehouse">
+                </div>
+              </div>
+            </div>
+
+            <!-- Inventory Controller -->
+            <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
+              <span class="role-badge" style="background: rgba(147, 51, 234, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 0.5rem; display: inline-block;">3. Inventory Controller</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                <div class="form-group">
+                  <label class="form-label">Nama Lengkap:</label>
+                  <input type="text" id="cfg-sig-ctrl-name" class="app-input" placeholder="HENDRA WIJAYA">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Jabatan:</label>
+                  <input type="text" id="cfg-sig-ctrl-pos" class="app-input" placeholder="Inventory Controller">
+                </div>
+              </div>
+            </div>
+
+            <!-- Accounting -->
+            <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
+              <span class="role-badge role-auditor" style="margin-bottom: 0.5rem; display: inline-block;">4. Cost & Inventory Accounting</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                <div class="form-group">
+                  <label class="form-label">Nama Lengkap:</label>
+                  <input type="text" id="cfg-sig-acc-name" class="app-input" placeholder="SITI RAHAYU, SE.">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Jabatan:</label>
+                  <input type="text" id="cfg-sig-acc-pos" class="app-input" placeholder="Cost & Inventory Accounting">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Customization Profil Dokumen & Target Akurasi -->
+        <div class="settings-card">
+          <div class="settings-card-head">
+            <div class="settings-card-title">
+              <i class="fa-solid fa-building" style="color: var(--status-reloc);"></i>
+              <span>Profil Lembaga & Standar Audit</span>
+            </div>
+            <div class="settings-card-desc">Konfigurasi nama perusahaan pada kop Berita Acara dan target akurasi stok (IRA).</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 1.15rem;">
+            <div class="form-group">
+              <label class="form-label">Nama Perusahaan (Kop Surat):</label>
+              <input type="text" id="cfg-company-name" class="app-input" placeholder="PT INDUSTRI PANGAN NUSANTARA">
+              <span class="form-hint">Muncul pada bagian paling atas kop Berita Acara fisik A4.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Divisi / Departemen:</label>
+              <input type="text" id="cfg-division-name" class="app-input" placeholder="Warehouse & Supply Chain Division &bull; RMPM Department">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Format Nomor Dokumen Berita Acara:</label>
+              <input type="text" id="cfg-doc-number" class="app-input font-mono" placeholder="BA-CC-RMPM/2026/09/21-01">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Target Standar Akurasi Stok IRA (%):</label>
+              <input type="number" step="0.1" id="cfg-ira-target" class="app-input font-mono" placeholder="98.0">
+              <span class="form-hint">Standar industri manufacturing/FMCG umumnya &ge; 98.0%.</span>
+            </div>
+
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-main); display: flex; justify-content: flex-end;">
+              <button class="btn-core btn-primary" id="btn-save-admin-settings" style="min-width: 180px;">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Simpan Pengaturan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
   </main>
 
   <!-- ================= 3. MOBILE BOTTOM NAVIGATION ================= -->
@@ -476,7 +621,7 @@
       <i class="fa-solid fa-print" style="font-size: 1.2rem;"></i>
       <span>Cetak BA</span>
     </button>
-    <button class="bnav-item" data-target="view-import">
+    <button class="bnav-item admin-only-tab" data-target="view-import">
       <i class="fa-solid fa-file-import" style="font-size: 1.2rem;"></i>
       <span>Import</span>
     </button>
@@ -570,13 +715,13 @@
     </div>
   </div>
 
-  <!-- ================= 5. USER MODAL ================= -->
+  <!-- ================= 5. USER PROFILE MODAL ================= -->
   <div class="modal-overlay" id="modal-user-switcher" style="display: none;">
     <div class="modal-dialog" style="max-width: 440px;">
       <div class="modal-head">
         <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
-          <i class="fa-solid fa-users" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
-          Pilih Profil Akun
+          <i class="fa-solid fa-id-badge" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
+          Profil Pengguna Aktif
         </h3>
         <button class="btn-core btn-secondary btn-sm" data-close="modal-user-switcher">
           <i class="fa-solid fa-xmark"></i>
@@ -591,41 +736,26 @@
     </div>
   </div>
 
-  <!-- ================= 6. SUPABASE CONFIG MODAL ================= -->
-  <div class="modal-overlay" id="modal-supabase-config" style="display: none;">
-    <div class="modal-dialog" style="max-width: 500px;">
-      <div class="modal-head">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
-          <i class="fa-solid fa-database" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
-          Koneksi Otomatis Supabase Database
-        </h3>
-        <button class="btn-core btn-secondary btn-sm" data-close="modal-supabase-config">
-          <i class="fa-solid fa-xmark"></i>
+  <!-- ================= 6. ENTERPRISE LOGIN SESSION MODAL ================= -->
+  <div class="login-overlay" id="modal-auth-login" style="display: none;">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="fa-solid fa-warehouse"></i>
+        </div>
+        <h2 class="login-title">RMPM Cycle Count System</h2>
+        <p class="login-subtitle">Silakan pilih profil akun kerja untuk masuk ke sesi:</p>
+      </div>
+
+      <div class="user-select-list" id="login-user-list">
+        <!-- Rendered by AuthManager JS -->
+      </div>
+
+      <div style="margin-top: 0.5rem;">
+        <button class="btn-core btn-primary" id="btn-do-login" style="width: 100%; height: 46px; font-size: 0.95rem;">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>Masuk ke Sistem</span>
         </button>
-      </div>
-      <div class="modal-body">
-        <div>
-          <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 0.35rem;">Supabase Project URL:</label>
-          <input type="url" id="cfg-supabase-url" class="app-input font-mono" style="width: 100%;" placeholder="https://xxxxxxxx.supabase.co">
-          <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; display: block;">
-            Dapatkan dari: Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project URL
-          </span>
-        </div>
-        <div>
-          <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 0.35rem;">Publishable API Key (Otomatis Tersambung):</label>
-          <input type="text" class="app-input font-mono" readonly value="sb_publishable_fmfAwbFQbEsVaW_wGI73uQ_pbpbiQGN" style="width: 100%; font-size: 0.75rem; background: var(--surface-subtle); color: var(--text-muted);">
-        </div>
-        <div style="background-color: var(--surface-subtle); border: 1px solid var(--border-main); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-secondary);">
-          <strong style="color: var(--brand-primary); display: block; margin-bottom: 0.25rem;">
-            <i class="fa-solid fa-shield-halved" style="margin-right: 0.3rem;"></i>
-            Mekanisme Database Aman:
-          </strong>
-          File <code style="background: var(--surface-main); padding: 0.1rem 0.3rem; border-radius: 3px;">supabase/schema.sql</code> telah dikonfigurasi aman & idempotent (tidak akan menghapus atau menimpa data hitung aktif di database live).
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn-core btn-secondary" data-close="modal-supabase-config">Tutup</button>
-        <button class="btn-core btn-primary" id="btn-save-supabase-config">Hubungkan Otomatis</button>
       </div>
     </div>
   </div>
@@ -637,10 +767,11 @@
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Application Modules -->
+  <!-- Application Modules & OOP Models -->
   <script src="js/config.js"></script>
-  <script src="js/supabase-client.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/supabase-client.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

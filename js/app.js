@@ -1,66 +1,171 @@
-// ==========================================================================
-// RMPM Cycle Count System - Enterprise Industrial WMS Controller
-// Powered by: Font Awesome 6, SweetAlert2, DataTables, ApexCharts & Supabase
-// Default Theme: LIGHT THEME (Crisp, High-Contrast, Legible in Dark & Light)
-// ==========================================================================
-
-const STORAGE_KEYS = {
-  ITEMS: 'rmpm_cc_items_v1',
-  SCHEDULE: 'rmpm_cc_schedule_v1',
-  CURRENT_USER: 'rmpm_cc_user_v1',
-  THEME: 'rmpm_theme'
-};
+// ==============================================================================
+// RMPM Cycle Count System - Enterprise Industrial Controller (OOP Architecture)
+// Powered by: Models OOP, AuthManager (RBAC), DataTables, ApexCharts & Supabase
+// Zero Hardcode: All signature matrix & company profiles customizable by Admin
+// ==============================================================================
 
 class CycleCountApp {
   constructor() {
-    this.items = [];
-    this.schedule = {};
-    this.users = INITIAL_USERS;
-    this.currentUser = null;
-    this.activeTab = 'view-dashboard'; // Default desktop view: Table Editor
+    // 1. Initialize OOP Domain Repositories & Auth
+    this.repo = new CycleCountRepository();
+    this.auth = new AuthManager(INITIAL_USERS);
+    this.items = this.repo.items;
+    this.signatureMatrix = this.repo.signatureMatrix;
+    this.companyProfile = this.repo.companyProfile;
 
-    // Mobile Location & Guided Walkthrough State
+    // View state
+    this.activeTab = 'view-dashboard';
     this.uniqueBins = [];
     this.currentBinIndex = 0;
     this.currentItemIndexInBin = 0;
-    this.isFocusMode = true; // Guided single-item Zebra style
-    this.activePackWeight = 25; // default 25 KG per Sak
+    this.isFocusMode = true;
+    this.activePackWeight = 25;
 
-    // DataTables & Charts references
+    // Chart & Table references
     this.dataTable = null;
     this.iraDonutChart = null;
     this.varianceBarChart = null;
-
-    // Filters & Search
-    this.searchQuery = '';
-    this.activeEditItem = null;
+    this.selectedLoginUserId = null;
 
     this.init();
   }
 
   async init() {
     this.initTheme();
-    this.loadState();
     this.calculateUniqueBins();
     this.bindEvents();
-    this.renderUserBar();
-    this.updateSupabaseStatusUi();
-    this.renderActiveBinView();
-    this.renderDashboard();
     this.renderPrintout();
 
-    // Default to checker view on small handheld screens
-    if (window.innerWidth <= 768) {
-      this.switchView('view-checker');
+    // Check login session
+    if (!this.auth.isLoggedIn()) {
+      this.showLoginModal();
+    } else {
+      this.handleUserLoggedIn();
     }
 
-    // Automatic Supabase Real-time connection
+    // Auto-connect Supabase in background (Zero UI Popup)
+    this.updateCloudStatusUi();
     if (window.supabaseService && window.supabaseService.isConnected) {
       await this.initSupabaseSync();
     }
   }
 
-  // ================= 1. THEME CONTROLLER (DEFAULT LIGHT, HIGH CONTRAST DARK) =================
+  // ================= 1. AUTHENTICATION & LOGIN SESSION (RBAC) =================
+  showLoginModal() {
+    const modal = document.getElementById('modal-auth-login');
+    const container = document.getElementById('login-user-list');
+    container.innerHTML = '';
+
+    const users = this.auth.users;
+    this.selectedLoginUserId = users[0].id; // Default: SPV Asep
+
+    users.forEach((u, idx) => {
+      const option = document.createElement('div');
+      option.className = `user-login-option ${idx === 0 ? 'selected' : ''}`;
+      option.dataset.userId = u.id;
+
+      let roleBadgeClass = 'role-admin';
+      let roleDesc = 'Akses Penuh: Dashboard, Scanner, BA, Import, Pengaturan TTD';
+      if (u.role === 'CHECKER') {
+        roleBadgeClass = 'role-checker';
+        roleDesc = 'Akses Lapangan: Hitung Fisik Rak BIN, Scanner, Kalkulator';
+      } else if (u.role === 'AUDITOR' || u.role === 'ACCOUNTING') {
+        roleBadgeClass = 'role-auditor';
+        roleDesc = 'Akses Verifikasi: View-only Table Editor, Analytics, Cetak BA';
+      }
+
+      option.innerHTML = `
+        <div class="user-login-option-left">
+          <div class="user-login-avatar">${u.name.charAt(0)}</div>
+          <div>
+            <div class="user-login-name">${u.name}</div>
+            <div class="user-login-role">${u.title}</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">${roleDesc}</div>
+          </div>
+        </div>
+        <span class="role-badge ${roleBadgeClass}">${u.role}</span>
+      `;
+
+      option.addEventListener('click', () => {
+        document.querySelectorAll('.user-login-option').forEach(el => el.classList.remove('selected'));
+        option.classList.add('selected');
+        this.selectedLoginUserId = u.id;
+      });
+
+      container.appendChild(option);
+    });
+
+    modal.style.display = 'flex';
+  }
+
+  handleUserLoggedIn() {
+    const user = this.auth.currentUser;
+    if (!user) return;
+
+    // Update Navbar user chip
+    document.getElementById('user-avatar-initial').textContent = user.name.charAt(0);
+    document.getElementById('current-user-name').textContent = user.name.split(' ')[0];
+    document.getElementById('current-user-role').textContent = user.role;
+
+    // Apply Role-Based Access Control
+    this.applyRolePermissions();
+
+    // Render active views
+    this.renderActiveBinView();
+    this.renderDashboard();
+    this.renderPrintout();
+    this.loadAdminSettingsForm();
+  }
+
+  applyRolePermissions() {
+    const user = this.auth.currentUser;
+    const settingsTab = document.getElementById('tab-nav-settings');
+    const importTab = document.getElementById('tab-nav-import');
+    const resetBtn = document.getElementById('btn-dash-reset');
+    const adminBottomTab = document.querySelector('.admin-only-tab');
+
+    if (this.auth.isAdmin()) {
+      // Administrator: Full access
+      if (settingsTab) settingsTab.style.display = 'inline-flex';
+      if (importTab) importTab.style.display = 'inline-flex';
+      if (resetBtn) resetBtn.style.display = 'inline-flex';
+      if (adminBottomTab) adminBottomTab.style.display = 'flex';
+      this.switchView('view-dashboard');
+    } else if (this.auth.isChecker()) {
+      // Checker: Mobile scanner focus, hide admin features
+      if (settingsTab) settingsTab.style.display = 'none';
+      if (importTab) importTab.style.display = 'none';
+      if (resetBtn) resetBtn.style.display = 'none';
+      if (adminBottomTab) adminBottomTab.style.display = 'none';
+      this.switchView('view-checker');
+    } else {
+      // Auditor / Accounting: View-only dashboard & printout
+      if (settingsTab) settingsTab.style.display = 'none';
+      if (importTab) importTab.style.display = 'none';
+      if (resetBtn) resetBtn.style.display = 'none';
+      if (adminBottomTab) adminBottomTab.style.display = 'none';
+      this.switchView('view-dashboard');
+    }
+  }
+
+  logout() {
+    Swal.fire({
+      title: 'Keluar dari Sesi Kerja?',
+      text: 'Sesi pengguna aktif akan diakhiri.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-right-from-bracket"></i> Ya, Keluar',
+      cancelButtonText: 'Batal',
+      customClass: { popup: 'swal-custom-popup' }
+    }).then(result => {
+      if (result.isConfirmed) {
+        this.auth.logout();
+        this.showLoginModal();
+      }
+    });
+  }
+
+  // ================= 2. THEME CONTROLLER =================
   initTheme() {
     const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'light';
     this.applyTheme(savedTheme);
@@ -78,64 +183,12 @@ class CycleCountApp {
 
     const icon = document.getElementById('theme-toggle-icon');
     if (icon) {
-      // If dark theme, show sun; if light, show moon
       icon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
     }
 
-    // Refresh charts theme if initialized
     if (this.iraDonutChart || this.varianceBarChart) {
       this.renderAnalyticsCharts();
     }
-  }
-
-  // ================= 2. STATE PERSISTENCE =================
-  loadState() {
-    // Load Items
-    const storedItems = localStorage.getItem(STORAGE_KEYS.ITEMS);
-    if (storedItems) {
-      try {
-        this.items = JSON.parse(storedItems);
-      } catch (e) {
-        this.items = [...INITIAL_ITEMS];
-      }
-    } else {
-      this.items = [...INITIAL_ITEMS];
-      this.saveItems();
-    }
-
-    // Load Schedule Metadata
-    const storedSchedule = localStorage.getItem(STORAGE_KEYS.SCHEDULE);
-    if (storedSchedule) {
-      try {
-        this.schedule = JSON.parse(storedSchedule);
-      } catch (e) {
-        this.schedule = { ...INITIAL_SCHEDULE };
-      }
-    } else {
-      this.schedule = { ...INITIAL_SCHEDULE };
-      this.saveSchedule();
-    }
-
-    // Load Current User (Default: Supervisor Asep on desktop, Checker on mobile)
-    const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (storedUser) {
-      const found = this.users.find(u => u.id === storedUser);
-      this.currentUser = found || this.users[0];
-    } else {
-      this.currentUser = window.innerWidth <= 768 ? this.users[1] : this.users[0];
-    }
-  }
-
-  saveItems() {
-    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(this.items));
-  }
-
-  saveSchedule() {
-    localStorage.setItem(STORAGE_KEYS.SCHEDULE, JSON.stringify(this.schedule));
-  }
-
-  saveUser() {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, this.currentUser.id);
   }
 
   // ================= 3. UNIQUE BIN CALCULATIONS =================
@@ -177,7 +230,33 @@ class CycleCountApp {
       themeBtn.addEventListener('click', () => this.toggleTheme());
     }
 
-    // 3. Dashboard Filters
+    // 3. Logout Button
+    const logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => this.logout());
+    }
+
+    // 4. Do Login Button
+    const doLoginBtn = document.getElementById('btn-do-login');
+    if (doLoginBtn) {
+      doLoginBtn.addEventListener('click', () => {
+        if (this.selectedLoginUserId) {
+          this.auth.login(this.selectedLoginUserId);
+          document.getElementById('modal-auth-login').style.display = 'none';
+          this.handleUserLoggedIn();
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Masuk',
+            text: `Selamat datang, ${this.auth.currentUser.name} (${this.auth.currentUser.role})`,
+            timer: 1300,
+            showConfirmButton: false,
+            customClass: { popup: 'swal-custom-popup' }
+          });
+        }
+      });
+    }
+
+    // 5. Dashboard Filters
     const dashBin = document.getElementById('dash-filter-bin');
     if (dashBin) {
       dashBin.addEventListener('change', () => this.renderDashboard());
@@ -191,7 +270,7 @@ class CycleCountApp {
       dashSearch.addEventListener('input', () => this.renderDashboard());
     }
 
-    // 4. BIN Steppers (Prev / Next)
+    // 6. BIN Steppers (Prev / Next)
     document.getElementById('btn-prev-bin').addEventListener('click', () => {
       if (this.currentBinIndex > 0) {
         this.currentBinIndex--;
@@ -208,7 +287,7 @@ class CycleCountApp {
       }
     });
 
-    // 5. Mode Toggle (Focus vs List)
+    // 7. Mode Toggle (Focus vs List)
     document.getElementById('btn-toggle-focus-mode').addEventListener('click', () => {
       this.isFocusMode = !this.isFocusMode;
       const textSpan = document.getElementById('btn-toggle-focus-text');
@@ -218,14 +297,14 @@ class CycleCountApp {
       this.renderActiveBinView();
     });
 
-    // 6. Mobile Barcode & Search
+    // 8. Mobile Barcode & Search
     document.getElementById('mobile-barcode-search').addEventListener('input', (e) => {
       const q = e.target.value.trim().toLowerCase();
       this.searchQuery = q;
       this.handleSearchOrBarcode(q);
     });
 
-    // 7. Focus Item Steppers (Item Prev / Item Next in same BIN)
+    // 9. Focus Item Steppers (Item Prev / Item Next in same BIN)
     document.getElementById('fc-prev-item').addEventListener('click', () => {
       if (this.currentItemIndexInBin > 0) {
         this.currentItemIndexInBin--;
@@ -241,7 +320,7 @@ class CycleCountApp {
       }
     });
 
-    // 8. Focus Item Quick Match Button
+    // 10. Focus Item Quick Match Button
     document.getElementById('fc-btn-match').addEventListener('click', () => {
       const binItems = this.getItemsInCurrentBin();
       const currentItem = binItems[this.currentItemIndexInBin];
@@ -250,7 +329,7 @@ class CycleCountApp {
       }
     });
 
-    // 9. Focus Item Open Input & Packaging Calc
+    // 11. Focus Item Open Input & Packaging Calc
     document.getElementById('fc-btn-input-calc').addEventListener('click', () => {
       const binItems = this.getItemsInCurrentBin();
       const currentItem = binItems[this.currentItemIndexInBin];
@@ -259,7 +338,7 @@ class CycleCountApp {
       }
     });
 
-    // 10. Focus Item Misplaced Quick Trigger
+    // 12. Focus Item Misplaced Quick Trigger
     document.getElementById('fc-btn-misplaced').addEventListener('click', () => {
       const binItems = this.getItemsInCurrentBin();
       const currentItem = binItems[this.currentItemIndexInBin];
@@ -268,7 +347,7 @@ class CycleCountApp {
       }
     });
 
-    // 11. Modal Close Buttons
+    // 13. Modal Close Buttons
     document.querySelectorAll('[data-close]').forEach(btn => {
       btn.addEventListener('click', () => {
         const modalId = btn.getAttribute('data-close');
@@ -277,56 +356,30 @@ class CycleCountApp {
       });
     });
 
-    // 12. User Switcher Modal
+    // 14. User Profile Info Modal
     document.getElementById('btn-open-user-modal').addEventListener('click', () => {
-      this.openUserModal();
+      this.openUserProfileModal();
     });
 
-    // 13. Supabase Config Modal & Auto-Connect
-    document.getElementById('btn-supabase-status').addEventListener('click', () => {
-      document.getElementById('cfg-supabase-url').value = localStorage.getItem('rmpm_supabase_url') || APP_CONFIG.SUPABASE_URL || '';
-      document.getElementById('modal-supabase-config').style.display = 'flex';
-    });
-
-    document.getElementById('btn-save-supabase-config').addEventListener('click', async () => {
-      const urlInput = document.getElementById('cfg-supabase-url').value.trim();
-      if (!urlInput) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'URL Belum Diisi',
-          text: 'Masukkan URL Supabase Project yang valid (contoh: https://xxxxxxxx.supabase.co)',
-          customClass: { popup: 'swal-custom-popup' }
-        });
-        return;
-      }
-      if (window.supabaseService) {
-        window.supabaseService.setUrl(urlInput);
-        this.updateSupabaseStatusUi();
-        await this.initSupabaseSync();
-      }
-      document.getElementById('modal-supabase-config').style.display = 'none';
-      Swal.fire({
-        icon: 'success',
-        title: 'Koneksi Supabase Disimpan',
-        text: 'Sinkronisasi Realtime Database sekarang aktif secara otomatis.',
-        customClass: { popup: 'swal-custom-popup' }
-      });
-    });
-
-    // 14. Packaging Converter Steppers in Modal
+    // 15. Packaging Converter Steppers in Modal
     this.bindPackagingModalEvents();
 
-    // 15. Dashboard Action Buttons
+    // 16. Dashboard Action Buttons
     document.getElementById('btn-dash-export').addEventListener('click', () => this.exportCsv());
     document.getElementById('btn-dash-reset').addEventListener('click', () => this.resetDemoData());
     document.getElementById('btn-dash-print').addEventListener('click', () => this.switchView('view-printout'));
 
-    // 16. Import SAP Button
+    // 17. Import SAP Button
     document.getElementById('btn-process-import').addEventListener('click', () => this.processSapImport());
+
+    // 18. Save Admin Settings Button
+    const saveAdminBtn = document.getElementById('btn-save-admin-settings');
+    if (saveAdminBtn) {
+      saveAdminBtn.addEventListener('click', () => this.saveAdminSettings());
+    }
   }
 
   bindPackagingModalEvents() {
-    // Preset buttons
     document.querySelectorAll('.btn-pack-preset').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.btn-pack-preset').forEach(b => b.classList.remove('active'));
@@ -356,7 +409,6 @@ class CycleCountApp {
       });
     });
 
-    // Minus / Plus Stepper
     document.getElementById('btn-pack-minus').addEventListener('click', () => {
       const input = document.getElementById('calc-pack-qty');
       let val = parseInt(input.value) || 0;
@@ -397,11 +449,10 @@ class CycleCountApp {
 
     document.getElementById('input-actual-qty').value = calculatedTotal.toFixed(3);
 
-    // Auto set descriptive note if empty
     const noteField = document.getElementById('input-item-note');
     if (!noteField.value || noteField.value.includes('Sak') || noteField.value.includes('Box')) {
       if (packCount > 0) {
-        noteField.value = `${packCount} Sak/Kemasan (@${this.activePackWeight}kg)${partialKg > 0 ? ' + ' + partialKg + ' kg sisa' : ''}`;
+        noteField.value = `${packCount} Kemasan (@${this.activePackWeight}kg)${partialKg > 0 ? ' + ' + partialKg + ' kg sisa' : ''}`;
       }
     }
   }
@@ -413,7 +464,6 @@ class CycleCountApp {
       return;
     }
 
-    // 1. Direct BIN match?
     const binIdx = this.uniqueBins.findIndex(b => b.toLowerCase() === query);
     if (binIdx !== -1) {
       this.currentBinIndex = binIdx;
@@ -422,7 +472,6 @@ class CycleCountApp {
       return;
     }
 
-    // 2. Material Code / Batch match?
     const itemIdx = this.items.findIndex(i =>
       i.materialNumber.toLowerCase() === query ||
       i.batchFisik.toLowerCase() === query ||
@@ -442,25 +491,42 @@ class CycleCountApp {
       return;
     }
 
-    // 3. Fallback: filter list
     this.renderActiveBinView();
   }
 
   // ================= 6. NAVIGATION SWITCHER =================
   switchView(viewId) {
+    // Role protection
+    if (viewId === 'view-settings' && !this.auth.isAdmin()) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Akses Ditolak',
+        text: 'Menu Pengaturan hanya dapat diakses oleh Administrator / SPV.',
+        customClass: { popup: 'swal-custom-popup' }
+      });
+      return;
+    }
+
+    if (viewId === 'view-import' && !this.auth.isAdmin()) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Akses Ditolak',
+        text: 'Menu Import SAP hanya dapat diakses oleh Administrator.',
+        customClass: { popup: 'swal-custom-popup' }
+      });
+      return;
+    }
+
     this.activeTab = viewId;
 
-    // Toggle active sections
     document.querySelectorAll('.view-section').forEach(s => {
       s.classList.toggle('active', s.id === viewId);
     });
 
-    // Update Desktop Navbar Links
     document.querySelectorAll('.nav-link-btn').forEach(tab => {
       tab.classList.toggle('active', tab.getAttribute('data-target') === viewId);
     });
 
-    // Update Mobile Bottom Nav
     document.querySelectorAll('.bnav-item').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-target') === viewId);
     });
@@ -471,33 +537,23 @@ class CycleCountApp {
       this.renderDashboard();
     } else if (viewId === 'view-printout') {
       this.renderPrintout();
+    } else if (viewId === 'view-settings') {
+      this.loadAdminSettingsForm();
     }
   }
 
-  // ================= 7. USER & CLOUD STATUS =================
-  renderUserBar() {
-    if (!this.currentUser) return;
-    document.getElementById('user-avatar-initial').textContent = this.currentUser.name.charAt(0);
-    document.getElementById('current-user-name').textContent = this.currentUser.name.split(' ')[0];
-    document.getElementById('current-user-role').textContent = this.currentUser.role;
-  }
-
-  updateSupabaseStatusUi() {
+  // ================= 7. CLOUD STATUS (AUTOMATIC BACKEND CONNECTION) =================
+  updateCloudStatusUi() {
     const dot = document.getElementById('sb-status-dot');
     const text = document.getElementById('sb-status-text');
-    const btn = document.getElementById('btn-supabase-status');
-    if (!dot || !text || !btn) return;
+    if (!dot || !text) return;
 
     if (window.supabaseService && window.supabaseService.isConnected) {
       dot.style.color = 'var(--brand-primary)';
-      text.textContent = 'Cloud Sync';
-      btn.style.borderColor = 'var(--brand-primary)';
-      btn.style.color = 'var(--text-main)';
+      text.textContent = 'Cloud Sync: Active';
     } else {
-      dot.style.color = 'var(--status-pending)';
-      text.textContent = 'Hubungkan DB';
-      btn.style.borderColor = 'var(--border-strong)';
-      btn.style.color = 'var(--text-muted)';
+      dot.style.color = 'var(--text-muted)';
+      text.textContent = 'Local Database';
     }
   }
 
@@ -505,9 +561,10 @@ class CycleCountApp {
     try {
       const cloudItems = await window.supabaseService.fetchItems();
       if (cloudItems && cloudItems.length > 0) {
-        this.items = cloudItems;
+        this.items = cloudItems.map(i => CycleCountItem.fromJSON(i));
+        this.repo.items = this.items;
         this.calculateUniqueBins();
-        this.saveItems();
+        this.repo.saveItems();
         this.renderActiveBinView();
         this.renderDashboard();
         this.renderPrintout();
@@ -519,12 +576,12 @@ class CycleCountApp {
           if (idx !== -1) {
             this.items[idx].actualQty = payload.new.actual_qty !== null ? parseFloat(payload.new.actual_qty) : null;
             this.items[idx].note = payload.new.note || '';
-            this.items[idx].isMisplaced = !!payload.new.is_misplaced;
+            this.items[idx].isMisplaced = Boolean(payload.new.is_misplaced);
             this.items[idx].newBin = payload.new.new_bin || '';
             this.items[idx].status = payload.new.status || 'PENDING';
             this.items[idx].countedBy = payload.new.counted_by || '';
             this.items[idx].countedAt = payload.new.counted_at || '';
-            this.saveItems();
+            this.repo.saveItems();
             this.renderActiveBinView();
             this.renderDashboard();
             this.renderPrintout();
@@ -536,75 +593,121 @@ class CycleCountApp {
     }
   }
 
-  openUserModal() {
+  openUserProfileModal() {
     const container = document.getElementById('users-list-container');
     container.innerHTML = '';
+    const user = this.auth.currentUser;
+    if (!user) return;
 
-    this.users.forEach(u => {
-      const isCurrent = this.currentUser && this.currentUser.id === u.id;
-      const card = document.createElement('div');
-      card.style.cssText = `
-        background-color: var(--surface-subtle);
-        border: 1px solid ${isCurrent ? 'var(--brand-primary)' : 'var(--border-main)'};
-        border-radius: var(--radius-sm);
-        padding: 0.75rem 1rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 0.5rem;
-        transition: all 0.15s;
-      `;
-
-      card.innerHTML = `
-        <div>
-          <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${u.name}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">${u.title} &bull; <strong style="color: var(--brand-primary);">${u.badge}</strong></div>
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div style="background: var(--surface-subtle); padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main); text-align: center;">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--brand-surface); color: var(--brand-primary); font-size: 1.5rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; border: 1px solid var(--brand-border);">
+          ${user.name.charAt(0)}
         </div>
-        <div>
-          ${isCurrent ? '<span style="font-size: 0.75rem; color: var(--brand-primary); font-weight: 800;"><i class="fa-solid fa-check"></i> AKTIF</span>' : '<button class="btn-core btn-secondary btn-sm">Pilih</button>'}
+        <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.2rem;">${user.name}</h4>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">${user.title}</div>
+        <div style="margin-top: 0.65rem;">
+          <span class="role-badge ${user.role === 'ADMIN' ? 'role-admin' : (user.role === 'CHECKER' ? 'role-checker' : 'role-auditor')}">
+            OTORITAS: ${user.role}
+          </span>
         </div>
-      `;
-
-      card.addEventListener('click', () => {
-        this.currentUser = u;
-        this.saveUser();
-        this.renderUserBar();
-        document.getElementById('modal-user-switcher').style.display = 'none';
-
-        if (u.role === 'CHECKER') {
-          this.switchView('view-checker');
-        } else {
-          this.switchView('view-dashboard');
-        }
-
-        Swal.fire({
-          icon: 'info',
-          title: 'Akun Aktif',
-          text: `Beralih ke profil ${u.name} (${u.role})`,
-          timer: 1200,
-          showConfirmButton: false,
-          customClass: { popup: 'swal-custom-popup' }
-        });
-      });
-
-      container.appendChild(card);
-    });
-
+      </div>
+    `;
+    container.appendChild(div);
     document.getElementById('modal-user-switcher').style.display = 'flex';
   }
 
-  // ================= 8. CHECKER ACTIVE BIN VIEW RENDERING =================
+  // ================= 8. ADMIN SETTINGS: CUSTOMIZATION TTD & MASTER DATA =================
+  loadAdminSettingsForm() {
+    const sigs = this.signatureMatrix;
+    const comp = this.companyProfile;
+
+    // Load Signatures
+    if (document.getElementById('cfg-sig-checker-name')) {
+      document.getElementById('cfg-sig-checker-name').value = sigs.checker.name;
+      document.getElementById('cfg-sig-checker-pos').value = sigs.checker.position;
+
+      document.getElementById('cfg-sig-spv-name').value = sigs.supervisor.name;
+      document.getElementById('cfg-sig-spv-pos').value = sigs.supervisor.position;
+
+      document.getElementById('cfg-sig-ctrl-name').value = sigs.controller.name;
+      document.getElementById('cfg-sig-ctrl-pos').value = sigs.controller.position;
+
+      document.getElementById('cfg-sig-acc-name').value = sigs.accounting.name;
+      document.getElementById('cfg-sig-acc-pos').value = sigs.accounting.position;
+
+      // Load Company & Audit
+      document.getElementById('cfg-company-name').value = comp.companyName;
+      document.getElementById('cfg-division-name').value = `${comp.divisionName} • ${comp.departmentName}`;
+      document.getElementById('cfg-doc-number').value = comp.docNumber;
+      document.getElementById('cfg-ira-target').value = comp.iraTargetPercent;
+    }
+  }
+
+  saveAdminSettings() {
+    if (!this.auth.isAdmin()) return;
+
+    // Update Signatures
+    this.signatureMatrix.updateOfficer('checker', {
+      name: document.getElementById('cfg-sig-checker-name').value,
+      position: document.getElementById('cfg-sig-checker-pos').value
+    });
+
+    this.signatureMatrix.updateOfficer('supervisor', {
+      name: document.getElementById('cfg-sig-spv-name').value,
+      position: document.getElementById('cfg-sig-spv-pos').value
+    });
+
+    this.signatureMatrix.updateOfficer('controller', {
+      name: document.getElementById('cfg-sig-ctrl-name').value,
+      position: document.getElementById('cfg-sig-ctrl-pos').value
+    });
+
+    this.signatureMatrix.updateOfficer('accounting', {
+      name: document.getElementById('cfg-sig-acc-name').value,
+      position: document.getElementById('cfg-sig-acc-pos').value
+    });
+
+    // Update Company & Target
+    const divDeptStr = document.getElementById('cfg-division-name').value;
+    const parts = divDeptStr.split('•');
+    const divName = parts[0] ? parts[0].trim() : 'Warehouse & Supply Chain Division';
+    const deptName = parts[1] ? parts[1].trim() : 'RMPM Department';
+
+    this.companyProfile.update({
+      companyName: document.getElementById('cfg-company-name').value,
+      divisionName: divName,
+      departmentName: deptName,
+      docNumber: document.getElementById('cfg-doc-number').value,
+      iraTargetPercent: parseFloat(document.getElementById('cfg-ira-target').value) || 98.0
+    });
+
+    // Save to repository
+    this.repo.saveSignatures();
+    this.repo.saveCompany();
+
+    // Update Printout and Dashboard View
+    this.renderPrintout();
+    this.renderDashboard();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Pengaturan Disimpan',
+      text: 'Kustomisasi tanda tangan (TTD) dan standar audit telah diperbarui di Berita Acara.',
+      customClass: { popup: 'swal-custom-popup' }
+    });
+  }
+
+  // ================= 9. CHECKER ACTIVE BIN VIEW RENDERING =================
   renderActiveBinView() {
     const currentBin = this.getCurrentBin();
     const binItems = this.getItemsInCurrentBin();
 
-    // Update location strip
     document.getElementById('display-active-bin').textContent = currentBin;
     document.getElementById('display-active-bin-counter').textContent =
       `Rak ${this.currentBinIndex + 1} dari ${this.uniqueBins.length} &bull; ${binItems.length} Item`;
 
-    // Stepper button disabled states
     document.getElementById('btn-prev-bin').disabled = this.currentBinIndex === 0;
     document.getElementById('btn-next-bin').disabled = this.currentBinIndex >= this.uniqueBins.length - 1;
 
@@ -628,12 +731,11 @@ class CycleCountApp {
     }
 
     const item = binItems[this.currentItemIndexInBin];
-    const targetNet = item.qtySap - (item.pickingQty || 0);
-    const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-    const diff = isCounted ? (item.actualQty - targetNet) : null;
-    const isDiff = isCounted && Math.abs(diff) >= 0.001;
+    const targetNet = item.getTargetNet();
+    const isCounted = item.isCounted();
+    const diff = item.getVariance();
+    const isDiff = item.isDiscrepancy();
 
-    // Set Card UI
     document.getElementById('fc-bin').textContent = item.bin;
     document.getElementById('fc-mat-desc').textContent = item.materialDesc;
     document.getElementById('fc-mat-code').textContent = item.materialNumber;
@@ -644,7 +746,6 @@ class CycleCountApp {
     document.getElementById('fc-picking').textContent = `${item.pickingQty.toFixed(1)} ${item.uom}`;
     document.getElementById('fc-target-net').textContent = `${targetNet.toFixed(3)} ${item.uom}`;
 
-    // Status Badge with Font Awesome
     let badgeHtml = '<span class="app-badge badge-pending"><i class="fa-regular fa-clock"></i> BELUM HITUNG</span>';
     if (isCounted) {
       if (isDiff) {
@@ -658,7 +759,6 @@ class CycleCountApp {
     }
     document.getElementById('fc-status-badge').innerHTML = badgeHtml;
 
-    // Actual Figure & Diff
     if (isCounted) {
       document.getElementById('fc-actual-val').textContent = `${item.actualQty.toFixed(3)} ${item.uom}`;
       if (isDiff) {
@@ -675,7 +775,6 @@ class CycleCountApp {
       document.getElementById('fc-diff-val').style.display = 'none';
     }
 
-    // Notes Box
     const notesBox = document.getElementById('fc-notes-box');
     if (item.note || item.isMisplaced) {
       notesBox.style.display = 'block';
@@ -688,10 +787,7 @@ class CycleCountApp {
       notesBox.style.display = 'none';
     }
 
-    // Match Button text
     document.getElementById('fc-btn-match-text').textContent = `Sesuai Target (${targetNet.toFixed(0)} ${item.uom})`;
-
-    // Steppers inside BIN
     document.getElementById('fc-item-step-text').textContent = `Item ${this.currentItemIndexInBin + 1} dari ${binItems.length}`;
     document.getElementById('fc-prev-item').disabled = this.currentItemIndexInBin === 0;
     document.getElementById('fc-next-item').disabled = this.currentItemIndexInBin >= binItems.length - 1;
@@ -707,9 +803,9 @@ class CycleCountApp {
     }
 
     binItems.forEach((item) => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
+      const targetNet = item.getTargetNet();
+      const isCounted = item.isCounted();
+      const isDiff = item.isDiscrepancy();
 
       let badge = '<span class="app-badge badge-pending"><i class="fa-regular fa-clock"></i> BELUM</span>';
       if (isCounted) {
@@ -759,16 +855,17 @@ class CycleCountApp {
     });
   }
 
-  // ================= 9. QUICK MATCH & MODAL ACTIONS =================
+  // ================= 10. QUICK MATCH & MODAL ACTIONS =================
   quickMatchItem(item) {
-    const targetNet = item.qtySap - (item.pickingQty || 0);
-    item.actualQty = targetNet;
-    item.status = 'MATCHED';
-    item.note = item.note || 'Fisik utuh sesuai target SAP';
-    item.countedBy = this.currentUser ? this.currentUser.name : 'Petugas';
-    item.countedAt = new Date().toISOString().replace('T', ' ').substring(0, 16);
+    if (!this.auth.canEditItems()) {
+      Swal.fire({ icon: 'warning', title: 'Akses Ditolak', text: 'Peran akun Anda tidak memiliki hak akses mengubah stok fisik.' });
+      return;
+    }
 
-    this.saveItems();
+    const operatorName = this.auth.currentUser ? this.auth.currentUser.name : 'Petugas';
+    item.quickMatch(operatorName);
+
+    this.repo.saveItems();
     if (window.supabaseService) {
       window.supabaseService.syncItem(item);
     }
@@ -780,7 +877,7 @@ class CycleCountApp {
     Swal.fire({
       icon: 'success',
       title: 'Stok Sesuai (100% Cocok)',
-      text: `${item.materialDesc} telah ditandai cocok dengan SAP (${targetNet.toFixed(2)} ${item.uom}).`,
+      text: `${item.materialDesc} telah ditandai cocok dengan SAP (${item.getTargetNet().toFixed(2)} ${item.uom}).`,
       timer: 1200,
       showConfirmButton: false,
       customClass: { popup: 'swal-custom-popup' }
@@ -788,8 +885,13 @@ class CycleCountApp {
   }
 
   openCheckerInputModal(item, forceMisplaced = false) {
+    if (!this.auth.canEditItems()) {
+      Swal.fire({ icon: 'warning', title: 'Akses Ditolak', text: 'Peran akun Anda tidak memiliki hak akses mengubah stok fisik.' });
+      return;
+    }
+
     this.activeEditItem = item;
-    const targetNet = item.qtySap - (item.pickingQty || 0);
+    const targetNet = item.getTargetNet();
 
     document.getElementById('m-item-desc').textContent = item.materialDesc;
     document.getElementById('m-item-code').textContent = item.materialNumber;
@@ -801,7 +903,6 @@ class CycleCountApp {
     document.getElementById('input-actual-qty').value = item.actualQty !== null ? item.actualQty : '';
     document.getElementById('input-item-note').value = item.note || '';
 
-    // Misplaced
     const isMisplaced = forceMisplaced || item.isMisplaced;
     document.getElementById('check-is-misplaced').checked = isMisplaced;
     document.getElementById('misplaced-input-box').style.display = isMisplaced ? 'block' : 'none';
@@ -825,22 +926,14 @@ class CycleCountApp {
     }
 
     const actualQty = parseFloat(actualStr);
-    const targetNet = this.activeEditItem.qtySap - (this.activeEditItem.pickingQty || 0);
     const isMisplaced = document.getElementById('check-is-misplaced').checked;
     const newBin = document.getElementById('input-new-bin').value.trim();
     const note = document.getElementById('input-item-note').value.trim();
+    const operatorName = this.auth.currentUser ? this.auth.currentUser.name : 'Petugas';
 
-    this.activeEditItem.actualQty = actualQty;
-    this.activeEditItem.isMisplaced = isMisplaced;
-    this.activeEditItem.newBin = isMisplaced ? newBin : '';
-    this.activeEditItem.note = note;
-    this.activeEditItem.countedBy = this.currentUser ? this.currentUser.name : 'Petugas';
-    this.activeEditItem.countedAt = new Date().toISOString().replace('T', ' ').substring(0, 16);
+    this.activeEditItem.recordCount(actualQty, note, isMisplaced, newBin, operatorName);
 
-    const isMatch = Math.abs(actualQty - targetNet) < 0.001;
-    this.activeEditItem.status = isMatch ? 'MATCHED' : 'DISCREPANCY';
-
-    this.saveItems();
+    this.repo.saveItems();
     if (window.supabaseService) {
       window.supabaseService.syncItem(this.activeEditItem);
     }
@@ -851,8 +944,8 @@ class CycleCountApp {
     this.renderPrintout();
 
     Swal.fire({
-      icon: isMatch ? 'success' : 'warning',
-      title: isMatch ? 'Hasil Hitung Cocok' : 'Tercatat Selisih',
+      icon: this.activeEditItem.isMatched() ? 'success' : 'warning',
+      title: this.activeEditItem.isMatched() ? 'Hasil Hitung Cocok' : 'Tercatat Selisih',
       text: `${this.activeEditItem.materialDesc}: ${actualQty.toFixed(2)} ${this.activeEditItem.uom}`,
       timer: 1300,
       showConfirmButton: false,
@@ -860,29 +953,25 @@ class CycleCountApp {
     });
   }
 
-  // ================= 10. MODERN APEXCHARTS ANALYTICS =================
+  // ================= 11. MODERN APEXCHARTS ANALYTICS =================
   renderAnalyticsCharts() {
     if (typeof ApexCharts === 'undefined') return;
 
     let matched = 0;
     let discrepancy = 0;
     let pending = 0;
-
     const binVarianceMap = {};
 
     this.items.forEach(item => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-
       const binPrefix = item.bin ? item.bin.substring(0, 5) : 'OTHER';
       if (!binVarianceMap[binPrefix]) binVarianceMap[binPrefix] = 0;
 
-      if (!isCounted) {
+      if (!item.isCounted()) {
         pending++;
       } else {
-        const diff = item.actualQty - targetNet;
+        const diff = item.getVariance();
         binVarianceMap[binPrefix] += diff;
-        if (Math.abs(diff) < 0.001) {
+        if (item.isMatched()) {
           matched++;
         } else {
           discrepancy++;
@@ -894,7 +983,7 @@ class CycleCountApp {
     const textColor = isDark ? '#f8fafc' : '#0f172a';
     const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
-    // 1. Donut Chart (IRA Stock Accuracy)
+    // 1. Donut Chart
     const donutOptions = {
       series: [matched, discrepancy, pending],
       labels: ['Cocok (Matched)', 'Selisih (Discrepancy)', 'Belum Hitung'],
@@ -938,14 +1027,12 @@ class CycleCountApp {
 
     const donutEl = document.getElementById('chart-ira-donut');
     if (donutEl) {
-      if (this.iraDonutChart) {
-        this.iraDonutChart.destroy();
-      }
+      if (this.iraDonutChart) this.iraDonutChart.destroy();
       this.iraDonutChart = new ApexCharts(donutEl, donutOptions);
       this.iraDonutChart.render();
     }
 
-    // 2. Bar Chart (Discrepancy Variance per BIN)
+    // 2. Bar Chart
     const binCategories = Object.keys(binVarianceMap);
     const binValues = binCategories.map(k => parseFloat(binVarianceMap[k].toFixed(2)));
 
@@ -1004,15 +1091,13 @@ class CycleCountApp {
 
     const barEl = document.getElementById('chart-variance-bar');
     if (barEl) {
-      if (this.varianceBarChart) {
-        this.varianceBarChart.destroy();
-      }
+      if (this.varianceBarChart) this.varianceBarChart.destroy();
       this.varianceBarChart = new ApexCharts(barEl, barOptions);
       this.varianceBarChart.render();
     }
   }
 
-  // ================= 11. DASHBOARD RENDERING & DATATABLES =================
+  // ================= 12. DASHBOARD RENDERING & DATATABLES =================
   renderDashboard() {
     let total = this.items.length;
     let matched = 0;
@@ -1021,11 +1106,10 @@ class CycleCountApp {
     let netVariance = 0;
 
     this.items.forEach(item => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      if (item.actualQty !== null && item.actualQty !== undefined) {
-        const diff = item.actualQty - targetNet;
+      if (item.isCounted()) {
+        const diff = item.getVariance();
         netVariance += diff;
-        if (Math.abs(diff) < 0.001) {
+        if (item.isMatched()) {
           matched++;
         } else {
           diffCount++;
@@ -1042,8 +1126,13 @@ class CycleCountApp {
     document.getElementById('dash-net-variance').textContent = `Net Selisih: ${(netVariance >= 0 ? '+' : '') + netVariance.toFixed(2)} KG`;
     document.getElementById('dash-misplaced-items').textContent = `${misplacedCount} Item`;
     document.getElementById('dash-total-items').textContent = total;
-    
-    // Navbar badge count
+
+    // Benchmark target label from CompanyProfile model
+    const benchEl = document.getElementById('dash-ira-benchmark');
+    if (benchEl) {
+      benchEl.textContent = `Target Standar Audit: \u2265 ${this.companyProfile.iraTargetPercent.toFixed(1)}%`;
+    }
+
     const navBadge = document.getElementById('nav-item-count');
     if (navBadge) navBadge.textContent = total;
 
@@ -1051,29 +1140,22 @@ class CycleCountApp {
     this.items.forEach(i => totalSapKg += i.qtySap);
     document.getElementById('dash-total-sap').textContent = `Total SAP: ${totalSapKg.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
 
-    // Render ApexCharts Analytics
     this.renderAnalyticsCharts();
 
-    // Destroy existing DataTable instance before updating DOM rows
     if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable('#master-table')) {
       $('#master-table').DataTable().destroy();
     }
 
-    // Filter Items for Table
     const filterBin = document.getElementById('dash-filter-bin') ? document.getElementById('dash-filter-bin').value : 'ALL';
     const filterStatus = document.getElementById('dash-filter-status') ? document.getElementById('dash-filter-status').value : 'ALL';
     const searchVal = document.getElementById('dash-search-input') ? document.getElementById('dash-search-input').value.toLowerCase().trim() : '';
 
     const filteredItems = this.items.filter(item => {
       if (filterBin !== 'ALL' && !item.bin.startsWith(filterBin)) return false;
-      
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
 
-      if (filterStatus === 'DISCREPANCY' && !isDiff) return false;
-      if (filterStatus === 'MATCHED' && (!isCounted || isDiff)) return false;
-      if (filterStatus === 'PENDING' && isCounted) return false;
+      if (filterStatus === 'DISCREPANCY' && !item.isDiscrepancy()) return false;
+      if (filterStatus === 'MATCHED' && !item.isMatched()) return false;
+      if (filterStatus === 'PENDING' && item.isCounted()) return false;
       if (filterStatus === 'MISPLACED' && !item.isMisplaced) return false;
 
       if (searchVal) {
@@ -1084,15 +1166,14 @@ class CycleCountApp {
       return true;
     });
 
-    // Render Table Rows
     const tbody = document.getElementById('dash-master-tbody');
     tbody.innerHTML = '';
 
     filteredItems.forEach((item, idx) => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const diff = isCounted ? (item.actualQty - targetNet) : 0;
-      const isDiff = isCounted && Math.abs(diff) >= 0.001;
+      const targetNet = item.getTargetNet();
+      const isCounted = item.isCounted();
+      const diff = item.getVariance();
+      const isDiff = item.isDiscrepancy();
 
       const tr = document.createElement('tr');
       if (isDiff) tr.className = 'row-discrepancy';
@@ -1143,7 +1224,6 @@ class CycleCountApp {
       tbody.appendChild(tr);
     });
 
-    // Initialize DataTables
     if (window.jQuery && $.fn.DataTable) {
       this.dataTable = $('#master-table').DataTable({
         pageLength: 10,
@@ -1164,7 +1244,6 @@ class CycleCountApp {
           }
         },
         drawCallback: () => {
-          // Re-bind click events on table pagination change
           document.querySelectorAll('[data-action="tbl-edit"]').forEach(btn => {
             btn.onclick = () => {
               const row = btn.closest('tr');
@@ -1178,16 +1257,47 @@ class CycleCountApp {
     }
   }
 
-  // ================= 12. OFFICIAL PRINTOUT RENDERING =================
+  // ================= 13. DYNAMIC BERITA ACARA PRINTOUT (OOP-POWERED) =================
   renderPrintout() {
+    const comp = this.companyProfile;
+    const sigs = this.signatureMatrix;
+
+    // 1. Dynamic Header & Document Info (Customizable)
+    const docCompEl = document.getElementById('doc-company-name');
+    if (docCompEl) docCompEl.textContent = comp.companyName;
+
+    const docDivEl = document.getElementById('doc-division-name');
+    if (docDivEl) docDivEl.textContent = `${comp.divisionName} • ${comp.departmentName}`;
+
+    const docNoEl = document.getElementById('doc-no-text');
+    if (docNoEl) docNoEl.textContent = comp.docNumber;
+
+    const docSpvEl = document.getElementById('doc-spv-text');
+    if (docSpvEl) docSpvEl.textContent = sigs.supervisor.name;
+
+    // 2. Dynamic 4-Tier Signatures Matrix (Customizable)
+    const setSig = (roleKey, titleId, nameId, posId) => {
+      const officer = sigs[roleKey];
+      if (document.getElementById(titleId)) document.getElementById(titleId).textContent = officer.title;
+      if (document.getElementById(nameId)) document.getElementById(nameId).textContent = officer.name;
+      if (document.getElementById(posId)) document.getElementById(posId).textContent = officer.position;
+    };
+
+    setSig('checker', 'sig-checker-title', 'sig-checker-name', 'sig-checker-position');
+    setSig('supervisor', 'sig-supervisor-title', 'sig-supervisor-name', 'sig-supervisor-position');
+    setSig('controller', 'sig-controller-title', 'sig-controller-name', 'sig-controller-position');
+    setSig('accounting', 'sig-accounting-title', 'sig-accounting-name', 'sig-accounting-position');
+
+    // 3. Render Table Rows
     const tbody = document.getElementById('printout-tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     this.items.forEach((item, idx) => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const diff = isCounted ? (item.actualQty - targetNet) : 0;
-      const isDiff = isCounted && Math.abs(diff) >= 0.001;
+      const targetNet = item.getTargetNet();
+      const isCounted = item.isCounted();
+      const diff = item.getVariance();
+      const isDiff = item.isDiscrepancy();
 
       const tr = document.createElement('tr');
       if (isDiff) tr.className = 'highlight-diff';
@@ -1219,13 +1329,13 @@ class CycleCountApp {
     });
   }
 
-  // ================= 13. EXPORT CSV & RESET =================
+  // ================= 14. EXPORT CSV & RESET =================
   exportCsv() {
     const headers = ['No', 'BIN', 'Kode Material', 'Deskripsi Material', 'Batch Fisik Vendor', 'Batch SAP', 'Qty SAP', 'Picking', 'Target Net', 'Aktual Fisik', 'Variance', 'Status', 'Catatan'];
     const rows = this.items.map((item, idx) => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const diff = isCounted ? (item.actualQty - targetNet) : '';
+      const targetNet = item.getTargetNet();
+      const isCounted = item.isCounted();
+      const diff = isCounted ? item.getVariance() : '';
 
       return [
         item.no || idx + 1,
@@ -1249,7 +1359,7 @@ class CycleCountApp {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Hasil_Cycle_Count_RMPM_${this.schedule.scheduleDate || 'Today'}.csv`;
+    link.download = `Hasil_Cycle_Count_RMPM_${new Date().toISOString().substring(0, 10)}.csv`;
     link.click();
 
     Swal.fire({
@@ -1263,6 +1373,11 @@ class CycleCountApp {
   }
 
   async resetDemoData() {
+    if (!this.auth.canResetData()) {
+      Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Hanya Administrator yang memiliki wewenang mereset data.' });
+      return;
+    }
+
     const res = await Swal.fire({
       title: 'Reset ke Data Contoh Asli?',
       text: 'Data akan dikembalikan ke 20 baris asli dari lembar kertas audit.',
@@ -1274,14 +1389,18 @@ class CycleCountApp {
     });
 
     if (res.isConfirmed) {
-      this.items = [...INITIAL_ITEMS];
+      this.repo.resetDemoData();
+      this.items = this.repo.items;
+      this.signatureMatrix = this.repo.signatureMatrix;
+      this.companyProfile = this.repo.companyProfile;
       this.calculateUniqueBins();
       this.currentBinIndex = 0;
       this.currentItemIndexInBin = 0;
-      this.saveItems();
+
       this.renderActiveBinView();
       this.renderDashboard();
       this.renderPrintout();
+      this.loadAdminSettingsForm();
 
       Swal.fire({
         icon: 'success',
@@ -1295,6 +1414,11 @@ class CycleCountApp {
   }
 
   processSapImport() {
+    if (!this.auth.canImportSap()) {
+      Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Hanya Administrator yang memiliki wewenang mengimpor data SAP.' });
+      return;
+    }
+
     const raw = document.getElementById('import-text-data').value.trim();
     if (!raw) {
       Swal.fire({
@@ -1313,7 +1437,7 @@ class CycleCountApp {
       let cols = line.split('\t');
       if (cols.length < 5) cols = line.split(/[\;,]/);
       if (cols.length >= 7) {
-        newItems.push({
+        newItems.push(new CycleCountItem({
           id: 'imported-' + Date.now() + '-' + idx,
           no: idx + 1,
           bin: cols[0].trim(),
@@ -1332,16 +1456,17 @@ class CycleCountApp {
           status: 'PENDING',
           countedBy: '',
           countedAt: ''
-        });
+        }));
       }
     });
 
     if (newItems.length > 0) {
       this.items = newItems;
+      this.repo.items = newItems;
       this.calculateUniqueBins();
       this.currentBinIndex = 0;
       this.currentItemIndexInBin = 0;
-      this.saveItems();
+      this.repo.saveItems();
       document.getElementById('import-text-data').value = '';
 
       Swal.fire({

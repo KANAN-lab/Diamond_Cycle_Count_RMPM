@@ -1083,6 +1083,206 @@ table.dataTable.no-footer {
   color: var(--text-muted);
 }
 
+/* ==========================================================================
+   11. LOGIN SESSION & ADMIN SETTINGS UI
+   ========================================================================== */
+.login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.login-card {
+  background: var(--surface-main);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
+  max-width: 480px;
+  width: 100%;
+  padding: 2rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login-header {
+  text-align: center;
+}
+
+.login-logo {
+  width: 48px;
+  height: 48px;
+  background-color: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  color: var(--brand-primary);
+  font-size: 1.5rem;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.login-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.login-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.user-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.user-login-option {
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  background-color: var(--surface-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.user-login-option:hover {
+  border-color: var(--border-strong);
+  background-color: var(--surface-hover);
+}
+
+.user-login-option.selected {
+  border-color: var(--brand-primary);
+  background-color: var(--brand-surface);
+}
+
+.user-login-option-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-login-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-main);
+  border: 1px solid var(--border-main);
+  color: var(--brand-primary);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-login-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.user-login-role {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.role-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+}
+
+.role-admin {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-border);
+}
+
+.role-checker {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.role-auditor {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Admin Settings Grid */
+.admin-settings-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1.5rem;
+}
+
+.settings-card {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settings-card-head {
+  border-bottom: 1px solid var(--border-main);
+  padding-bottom: 0.85rem;
+}
+
+.settings-card-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-card-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.form-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 @media print {
   body {
     background: #ffffff !important;
@@ -1093,6 +1293,7 @@ table.dataTable.no-footer {
   .mobile-bottom-nav,
   .table-toolbar,
   .modal-overlay,
+  .login-overlay,
   .btn-core,
   .kpi-deck,
   .chart-deck,
