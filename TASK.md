@@ -122,10 +122,17 @@
 - [x] **Pembersihan Modal Supabase di Frontend:**
   - Menghapus modal konfigurasi Supabase dari UI agar tidak membingungkan operator.
   - Koneksi database berjalan otomatis di latar belakang (*silent backend connection*).
+- [x] **Overhaul Responsivitas Layar Kecil (Mobile & Tablet Handheld):**
+  - **Zero Horizontal Overflow:** Menambahkan aturan pembatasan `overflow-x: hidden;` pada `html`, `body`, dan `.app-container` sehingga halaman tidak lagi tergeser atau terpotong pada layar 375px (iPhone SE).
+  - **Header & Navbar Compact:** Adaptasi kontrol kanan navbar (theme toggle, dot status realtime cloud dengan animasi pulse, avatar profil ringkas, tombol logout) muat rapi dalam 1 baris tanpa tumpang tindih.
+  - **KPI Deck Grid 2x2:** Restrukturisasi 4 kartu KPI menjadi matriks 2x2 yang seimbang dan proporsional di layar ponsel pintar.
+  - **Toolbar 3-Tier:** Input pencarian 100% lebar, filter BIN & Status 2 kolom, dan tombol aksi (Export, Reset, Cetak BA) 3 kolom merata.
+  - **Table & Print Sheet Scroll:** Menjamin tabel utama dan dokumen Berita Acara resmi terlindung dalam wrapper scroll horizontal mandiri beserta hint visual interaktif.
+  - **Form Grid & Modals:** Konversi layout multi-kolom modal dan setting tanda tangan ke stack 1 kolom vertikal yang ramah sentuhan.
 
 ---
 
-### FASE 7: RENCANA PENGEMBANGAN LANJUTAN (NEXT ROADMAP)
+### FASE 8: RENCANA PENGEMBANGAN LANJUTAN (NEXT ROADMAP)
 - [ ] **Task 7.1: Integrasi Hardware Camera Barcode Scanner (`html5-qrcode`):**
   - Menambahkan tombol kamera pada input barcode di mobile checker untuk memindai barcode Code-128 / QR Code langsung melalui kamera ponsel/tablet tanpa scanner fisik eksternal.
 - [ ] **Task 7.2: Digital Wet Signature Canvas (`signature_pad`):**

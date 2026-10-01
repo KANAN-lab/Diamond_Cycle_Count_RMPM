@@ -2,7 +2,7 @@
 <html lang="id" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>RMPM Cycle Count - Enterprise Warehouse Edition</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   
@@ -180,26 +180,28 @@
       <!-- Action Toolbar -->
       <div class="table-toolbar">
         <div class="toolbar-search-group">
-          <div style="position: relative; display: flex; align-items: center;">
+          <div class="search-input-box" style="position: relative; display: flex; align-items: center; flex: 1;">
             <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.75rem; color: var(--text-muted); font-size: 0.8rem;"></i>
-            <input type="text" id="dash-search-input" class="app-input" style="padding-left: 2.1rem; min-width: 250px;" placeholder="Cari Kode Material, BIN, Batch...">
+            <input type="text" id="dash-search-input" class="app-input" style="padding-left: 2.1rem; width: 100%;" placeholder="Cari Kode Material, BIN, Batch...">
           </div>
           
-          <select id="dash-filter-bin" class="app-select">
-            <option value="ALL">Semua BIN / Rak</option>
-            <option value="B.01A">Zona B.01A</option>
-            <option value="B.01B">Zona B.01B</option>
-            <option value="B.02A">Zona B.02A</option>
-            <option value="B.02B">Zona B.02B</option>
-          </select>
+          <div class="toolbar-filters-grid">
+            <select id="dash-filter-bin" class="app-select">
+              <option value="ALL">Semua BIN / Rak</option>
+              <option value="B.01A">Zona B.01A</option>
+              <option value="B.01B">Zona B.01B</option>
+              <option value="B.02A">Zona B.02A</option>
+              <option value="B.02B">Zona B.02B</option>
+            </select>
 
-          <select id="dash-filter-status" class="app-select">
-            <option value="ALL">Semua Status</option>
-            <option value="DISCREPANCY">Hanya Selisih (Discrepancy)</option>
-            <option value="MATCHED">Hanya Cocok (Matched)</option>
-            <option value="MISPLACED">Pindah Lokasi / Salah BIN</option>
-            <option value="PENDING">Belum Dihitung</option>
-          </select>
+            <select id="dash-filter-status" class="app-select">
+              <option value="ALL">Semua Status</option>
+              <option value="DISCREPANCY">Hanya Selisih (Discrepancy)</option>
+              <option value="MATCHED">Hanya Cocok (Matched)</option>
+              <option value="MISPLACED">Pindah Lokasi / Salah BIN</option>
+              <option value="PENDING">Belum Dihitung</option>
+            </select>
+          </div>
         </div>
 
         <div class="toolbar-action-group">
@@ -219,6 +221,10 @@
       </div>
 
       <!-- Master Grid Table with DataTables Support -->
+      <div class="table-scroll-hint mobile-only-flex">
+        <i class="fa-solid fa-arrows-left-right"></i>
+        <span>Geser tabel ke samping untuk melihat seluruh kolom data</span>
+      </div>
       <div class="table-wrapper">
         <table class="grid-table display" id="master-table" style="width:100%;">
           <thead>
@@ -387,7 +393,13 @@
         </button>
       </div>
 
-      <div class="print-document-sheet">
+      <div class="print-mobile-notice mobile-only-flex">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>Format resmi A4 Landscape. Geser dokumen ke samping untuk membaca seluruh tabel atau klik Cetak Dokumen di atas.</span>
+      </div>
+
+      <div class="print-sheet-scroll-container">
+        <div class="print-document-sheet">
         <div class="doc-header">
           <div>
             <div class="doc-company-title" id="doc-company-name">PT INDUSTRI PANGAN NUSANTARA</div>
@@ -461,6 +473,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
     </section>
 
@@ -558,7 +571,7 @@
             </div>
 
             <!-- Action Buttons Grid -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+            <div class="settings-actions-grid">
               <!-- Tombol Hapus Semua Dummy / Kosongkan -->
               <button class="btn-core btn-danger" id="btn-clear-dummy-data" style="height: 42px;">
                 <i class="fa-solid fa-trash-can"></i>
@@ -586,13 +599,13 @@
                   <span>Daftar Master SKU Material (CRUD Aktif)</span>
                 </div>
                 <div style="max-width: 280px; width: 100%;">
-                  <input type="text" id="settings-sku-search" class="app-input" style="height: 34px; font-size: 0.78rem;" placeholder="Cari BIN / Kode / Deskripsi...">
+                  <input type="text" id="settings-sku-search" class="app-input" style="height: 34px; font-size: 0.78rem; width: 100%;" placeholder="Cari BIN / Kode / Deskripsi...">
                 </div>
               </div>
 
               <!-- Table Container -->
-              <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-main); border-radius: var(--radius-sm); background: var(--surface-card);">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: left;" id="settings-sku-table">
+              <div class="settings-table-wrapper" style="max-height: 320px; overflow-y: auto; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-main); border-radius: var(--radius-sm); background: var(--surface-card);">
+                <table style="width: 100%; min-width: 520px; border-collapse: collapse; font-size: 0.78rem; text-align: left;" id="settings-sku-table">
                   <thead style="position: sticky; top: 0; background: var(--surface-subtle); border-bottom: 1px solid var(--border-main); z-index: 2;">
                     <tr>
                       <th style="padding: 0.5rem 0.65rem; width: 40px; text-align: center;">No</th>
@@ -632,7 +645,7 @@
             <!-- Checker -->
             <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
               <span class="role-badge role-checker" style="margin-bottom: 0.5rem; display: inline-block;">1. Petugas Hitung (Checker)</span>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+              <div class="form-row-2col">
                 <div class="form-group">
                   <label class="form-label">Nama Lengkap:</label>
                   <input type="text" id="cfg-sig-checker-name" class="app-input" placeholder="BUDI SANTOSO">
@@ -647,7 +660,7 @@
             <!-- Supervisor -->
             <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
               <span class="role-badge role-admin" style="margin-bottom: 0.5rem; display: inline-block;">2. Supervisor Warehouse (SPV)</span>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+              <div class="form-row-2col">
                 <div class="form-group">
                   <label class="form-label">Nama Lengkap:</label>
                   <input type="text" id="cfg-sig-spv-name" class="app-input" placeholder="ASEP SAEPULLAH">
@@ -662,7 +675,7 @@
             <!-- Inventory Controller -->
             <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
               <span class="role-badge" style="background: rgba(147, 51, 234, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 0.5rem; display: inline-block;">3. Inventory Controller</span>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+              <div class="form-row-2col">
                 <div class="form-group">
                   <label class="form-label">Nama Lengkap:</label>
                   <input type="text" id="cfg-sig-ctrl-name" class="app-input" placeholder="HENDRA WIJAYA">
@@ -677,7 +690,7 @@
             <!-- Accounting -->
             <div style="background: var(--surface-subtle); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-main);">
               <span class="role-badge role-auditor" style="margin-bottom: 0.5rem; display: inline-block;">4. Cost & Inventory Accounting</span>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+              <div class="form-row-2col">
                 <div class="form-group">
                   <label class="form-label">Nama Lengkap:</label>
                   <input type="text" id="cfg-sig-acc-name" class="app-input" placeholder="SITI RAHAYU, SE.">
@@ -884,7 +897,7 @@
         </button>
       </div>
       <form id="form-add-item" class="modal-body" style="gap: 0.85rem;" onsubmit="return false;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+        <div class="form-row-2col">
           <div class="form-group">
             <label class="form-label">Alamat Rak / BIN *</label>
             <input type="text" id="add-item-bin" class="app-input font-mono" placeholder="contoh: B.01A.1.01" required>
@@ -900,7 +913,7 @@
           <input type="text" id="add-item-desc" class="app-input" placeholder="contoh: Citric Acid Anhydrous" required>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+        <div class="form-row-2col">
           <div class="form-group">
             <label class="form-label">Batch SAP *</label>
             <input type="text" id="add-item-batch-sap" class="app-input font-mono" placeholder="contoh: CA-2026-X1" required>
@@ -911,7 +924,7 @@
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.65rem;">
+        <div class="form-row-3col">
           <div class="form-group">
             <label class="form-label">Qty SAP (KG) *</label>
             <input type="number" step="0.01" id="add-item-qty-sap" class="app-input font-mono" placeholder="1000" required>
@@ -955,7 +968,7 @@
       </div>
       <form id="form-edit-item" class="modal-body" style="gap: 0.85rem;" onsubmit="return false;">
         <input type="hidden" id="edit-item-id">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+        <div class="form-row-2col">
           <div class="form-group">
             <label class="form-label">Alamat Rak / BIN *</label>
             <input type="text" id="edit-item-bin" class="app-input font-mono" required>
@@ -971,7 +984,7 @@
           <input type="text" id="edit-item-desc" class="app-input" required>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+        <div class="form-row-2col">
           <div class="form-group">
             <label class="form-label">Batch SAP *</label>
             <input type="text" id="edit-item-batch-sap" class="app-input font-mono" required>
@@ -982,7 +995,7 @@
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.65rem;">
+        <div class="form-row-3col">
           <div class="form-group">
             <label class="form-label">Qty SAP (KG) *</label>
             <input type="number" step="0.01" id="edit-item-qty-sap" class="app-input font-mono" required>
