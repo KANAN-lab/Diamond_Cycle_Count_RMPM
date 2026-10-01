@@ -497,6 +497,38 @@ body {
   border-color: var(--border-strong);
 }
 
+.btn-danger {
+  background-color: var(--status-diff);
+  color: #ffffff;
+  border-color: var(--status-diff);
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.btn-danger-outline {
+  background-color: transparent;
+  border: 1px solid var(--status-diff);
+  color: var(--status-diff);
+}
+
+.btn-danger-outline:hover {
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+.btn-success {
+  background-color: var(--status-match);
+  color: #ffffff;
+  border-color: var(--status-match);
+}
+
+.btn-success:hover {
+  background-color: #15803d;
+  border-color: #15803d;
+}
+
 .btn-sm {
   height: 32px;
   padding: 0 0.65rem;

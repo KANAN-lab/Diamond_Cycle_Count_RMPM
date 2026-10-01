@@ -82,12 +82,15 @@ $$\text{Variance / Selisih (KG)} = \text{Qty Fisik Aktual} - \text{Target Bersih
    * **Disetujui Oleh:** Cost & Inventory Accounting
 4. `@media print` CSS yang mengisolasi tabel cetak dan menyembunyikan seluruh tombol navigasi web saat dialog *Print* browser dibuka.
 
-#### 4.6 Panel Pengaturan Administrator (Zero Hardcode Customization)
-Administrator dapat mengkustomisasi seluruh data operasional langsung dari UI tanpa perlu menyentuh kode sumber:
-* Nama & Jabatan 4 Penandatangan Berita Acara.
-* Nama Lembaga / Perusahaan pada kop surat.
-* Target Standar Akurasi Stok IRA (%).
-* Format penomoran dokumen resmi.
+#### 4.6 Panel Pengaturan Administrator & Kontrol Sesi (Zero Hardcode Customization)
+Administrator dan pengguna dapat mengelola seluruh konfigurasi operasional langsung dari UI tanpa perlu menyentuh kode sumber:
+* **Manajemen Sesi & RBAC:** Pengecekan sesi aktif, pergantian peran (SPV/Admin, Checker, Auditor) dalam 1 sentuhan, dan tombol logout.
+* **Manajemen Dataset & Data Dummy:**
+  * Tombol Hapus Dummy: Mengosongkan data secara bersih (0 SKU) untuk memulai siklus opname aktual.
+  * Tombol Muat 20 Dummy SAP: Mengembalikan dataset simulasi lengkap 4 skenario industri secara instan.
+  * Tambah SKU Manual: Form modal cepat untuk menambahkan 1 SKU material baru tanpa import file.
+* **Kustomisasi Tanda Tangan:** Nama & Jabatan 4 Penandatangan Berita Acara (Checker, SPV, Controller, Accounting).
+* **Profil Lembaga & Standar Audit:** Nama Lembaga / Perusahaan pada kop surat, format penomoran dokumen, dan Target Standar Akurasi Stok IRA (%).
 * Seluruh kustomisasi langsung terefleksi ke model OOP dan tersimpan ke penyimpanan persisten.
 
 ---

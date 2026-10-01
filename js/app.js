@@ -51,34 +51,42 @@ class CycleCountApp {
   }
 
   // ================= 1. AUTHENTICATION & LOGIN SESSION (RBAC) =================
-  showLoginModal() {
+  showLoginModal(canCancel = false) {
     const modal = document.getElementById('modal-auth-login');
     const container = document.getElementById('login-user-list');
+    const closeBtn = document.getElementById('btn-close-login-modal');
+    if (closeBtn) {
+      closeBtn.style.display = (canCancel && this.auth.isLoggedIn()) ? 'inline-flex' : 'none';
+    }
     container.innerHTML = '';
 
     const users = this.auth.users;
-    this.selectedLoginUserId = users[0].id; // Default: SPV Asep
+    this.selectedLoginUserId = this.auth.currentUser ? this.auth.currentUser.id : users[0].id;
 
     users.forEach((u, idx) => {
+      const isCurrentActive = this.auth.currentUser && this.auth.currentUser.id === u.id;
       const option = document.createElement('div');
-      option.className = `user-login-option ${idx === 0 ? 'selected' : ''}`;
+      option.className = `user-login-option ${u.id === this.selectedLoginUserId ? 'selected' : ''}`;
       option.dataset.userId = u.id;
 
       let roleBadgeClass = 'role-admin';
-      let roleDesc = 'Akses Penuh: Dashboard, Scanner, BA, Import, Pengaturan TTD';
+      let roleDesc = 'Akses Penuh: Dashboard, Scanner, BA, Import, Pengaturan TTD & Data';
       if (u.role === 'CHECKER') {
         roleBadgeClass = 'role-checker';
-        roleDesc = 'Akses Lapangan: Hitung Fisik Rak BIN, Scanner, Kalkulator';
+        roleDesc = 'Akses Lapangan: Hitung Fisik Rak BIN, Scanner, Kalkulator Kemasan';
       } else if (u.role === 'AUDITOR' || u.role === 'ACCOUNTING') {
         roleBadgeClass = 'role-auditor';
-        roleDesc = 'Akses Verifikasi: View-only Table Editor, Analytics, Cetak BA';
+        roleDesc = 'Akses Verifikasi: View-only Table Editor, Analytics, Cetak Berita Acara';
       }
 
       option.innerHTML = `
         <div class="user-login-option-left">
           <div class="user-login-avatar">${u.name.charAt(0)}</div>
           <div>
-            <div class="user-login-name">${u.name}</div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span class="user-login-name">${u.name}</span>
+              ${isCurrentActive ? '<span class="app-badge badge-matched" style="font-size: 0.62rem; padding: 0.1rem 0.35rem;">Sedang Aktif</span>' : ''}
+            </div>
             <div class="user-login-role">${u.title}</div>
             <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">${roleDesc}</div>
           </div>
@@ -90,6 +98,12 @@ class CycleCountApp {
         document.querySelectorAll('.user-login-option').forEach(el => el.classList.remove('selected'));
         option.classList.add('selected');
         this.selectedLoginUserId = u.id;
+      });
+
+      // Double click or fast select to login immediately
+      option.addEventListener('dblclick', () => {
+        this.selectedLoginUserId = u.id;
+        document.getElementById('btn-do-login').click();
       });
 
       container.appendChild(option);
@@ -107,7 +121,7 @@ class CycleCountApp {
     document.getElementById('current-user-name').textContent = user.name.split(' ')[0];
     document.getElementById('current-user-role').textContent = user.role;
 
-    // Apply Role-Based Access Control
+    // Apply Role-Based Access Control & update user info
     this.applyRolePermissions();
 
     // Render active views
@@ -115,6 +129,7 @@ class CycleCountApp {
     this.renderDashboard();
     this.renderPrintout();
     this.loadAdminSettingsForm();
+    this.updateSettingsDataInfo();
   }
 
   applyRolePermissions() {
@@ -123,28 +138,79 @@ class CycleCountApp {
     const importTab = document.getElementById('tab-nav-import');
     const resetBtn = document.getElementById('btn-dash-reset');
     const adminBottomTab = document.querySelector('.admin-only-tab');
+    const bnavSettings = document.getElementById('bnav-settings');
+
+    // Settings tab is ALWAYS accessible on desktop and mobile!
+    if (settingsTab) settingsTab.style.display = 'inline-flex';
+    if (bnavSettings) bnavSettings.style.display = 'flex';
 
     if (this.auth.isAdmin()) {
       // Administrator: Full access
-      if (settingsTab) settingsTab.style.display = 'inline-flex';
       if (importTab) importTab.style.display = 'inline-flex';
       if (resetBtn) resetBtn.style.display = 'inline-flex';
       if (adminBottomTab) adminBottomTab.style.display = 'flex';
       this.switchView('view-dashboard');
     } else if (this.auth.isChecker()) {
-      // Checker: Mobile scanner focus, hide admin features
-      if (settingsTab) settingsTab.style.display = 'none';
+      // Checker: Mobile scanner focus, hide import
       if (importTab) importTab.style.display = 'none';
       if (resetBtn) resetBtn.style.display = 'none';
       if (adminBottomTab) adminBottomTab.style.display = 'none';
       this.switchView('view-checker');
     } else {
       // Auditor / Accounting: View-only dashboard & printout
-      if (settingsTab) settingsTab.style.display = 'none';
       if (importTab) importTab.style.display = 'none';
       if (resetBtn) resetBtn.style.display = 'none';
       if (adminBottomTab) adminBottomTab.style.display = 'none';
       this.switchView('view-dashboard');
+    }
+
+    // Update User Profile in Settings Card
+    this.updateSettingsUserCard();
+    this.updateSettingsDataInfo();
+  }
+
+  updateSettingsUserCard() {
+    const user = this.auth.currentUser;
+    if (!user) return;
+
+    const avatarEl = document.getElementById('settings-user-avatar');
+    const nameEl = document.getElementById('settings-user-name');
+    const badgeEl = document.getElementById('settings-user-badge');
+    const titleEl = document.getElementById('settings-user-title');
+    const pillsEl = document.getElementById('settings-permission-pills');
+
+    if (avatarEl) avatarEl.textContent = user.name.charAt(0);
+    if (nameEl) nameEl.textContent = user.name;
+    if (titleEl) titleEl.textContent = user.title;
+    if (badgeEl) {
+      badgeEl.textContent = user.role;
+      badgeEl.className = `role-badge ${user.role === 'ADMIN' ? 'role-admin' : (user.role === 'CHECKER' ? 'role-checker' : 'role-auditor')}`;
+    }
+
+    if (pillsEl) {
+      const canEdit = this.auth.canEditItems();
+      const canImport = this.auth.canImportSap();
+      const canCustom = this.auth.canCustomizeSettings();
+      const canReset = this.auth.canResetData();
+
+      pillsEl.innerHTML = `
+        <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i class="fa-solid ${canEdit ? 'fa-circle-check' : 'fa-circle-xmark'}" style="color: ${canEdit ? 'var(--status-match)' : 'var(--text-muted)'};"></i>
+          Hitung Fisik: <strong>${canEdit ? 'Diizinkan' : 'Dibatasi'}</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i class="fa-solid ${canImport ? 'fa-circle-check' : 'fa-circle-xmark'}" style="color: ${canImport ? 'var(--status-match)' : 'var(--text-muted)'};"></i>
+          Import SAP: <strong>${canImport ? 'Diizinkan' : 'Dibatasi'}</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i class="fa-solid ${canCustom ? 'fa-circle-check' : 'fa-circle-xmark'}" style="color: ${canCustom ? 'var(--status-match)' : 'var(--text-muted)'};"></i>
+          Kustomisasi TTD: <strong>${canCustom ? 'Diizinkan' : 'Dibatasi'}</strong>
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i class="fa-solid ${canReset ? 'fa-circle-check' : 'fa-circle-xmark'}" style="color: ${canReset ? 'var(--status-match)' : 'var(--text-muted)'};"></i>
+          Hapus/Set Dummy: <strong>${canReset ? 'Diizinkan' : 'Dibatasi'}</strong>
+        </span>
+      `;
     }
   }
 
@@ -156,11 +222,12 @@ class CycleCountApp {
       showCancelButton: true,
       confirmButtonText: '<i class="fa-solid fa-right-from-bracket"></i> Ya, Keluar',
       cancelButtonText: 'Batal',
+      confirmButtonColor: '#dc2626',
       customClass: { popup: 'swal-custom-popup' }
     }).then(result => {
       if (result.isConfirmed) {
         this.auth.logout();
-        this.showLoginModal();
+        this.showLoginModal(false);
       }
     });
   }
@@ -252,6 +319,15 @@ class CycleCountApp {
             showConfirmButton: false,
             customClass: { popup: 'swal-custom-popup' }
           });
+        }
+      });
+    }
+
+    const closeLoginBtn = document.getElementById('btn-close-login-modal');
+    if (closeLoginBtn) {
+      closeLoginBtn.addEventListener('click', () => {
+        if (this.auth.isLoggedIn()) {
+          document.getElementById('modal-auth-login').style.display = 'none';
         }
       });
     }
@@ -356,23 +432,59 @@ class CycleCountApp {
       });
     });
 
-    // 14. User Profile Info Modal
-    document.getElementById('btn-open-user-modal').addEventListener('click', () => {
-      this.openUserProfileModal();
-    });
+    // 14. User Profile & Session Switcher
+    const openUserBtn = document.getElementById('btn-open-user-modal');
+    if (openUserBtn) {
+      openUserBtn.addEventListener('click', () => this.showLoginModal(true));
+    }
 
-    // 15. Packaging Converter Steppers in Modal
+    const settingsSwitchUserBtn = document.getElementById('btn-settings-switch-user');
+    if (settingsSwitchUserBtn) {
+      settingsSwitchUserBtn.addEventListener('click', () => this.showLoginModal(true));
+    }
+
+    const settingsLogoutBtn = document.getElementById('btn-settings-logout');
+    if (settingsLogoutBtn) {
+      settingsLogoutBtn.addEventListener('click', () => this.logout());
+    }
+
+    // 15. Settings Dataset & Dummy Data Management
+    const clearDummyBtn = document.getElementById('btn-clear-dummy-data');
+    if (clearDummyBtn) {
+      clearDummyBtn.addEventListener('click', () => this.clearDummyData());
+    }
+
+    const loadDummyBtn = document.getElementById('btn-load-dummy-data');
+    if (loadDummyBtn) {
+      loadDummyBtn.addEventListener('click', () => this.loadDefaultDummyData());
+    }
+
+    const openAddItemBtn = document.getElementById('btn-open-modal-add-item');
+    if (openAddItemBtn) {
+      openAddItemBtn.addEventListener('click', () => {
+        const form = document.getElementById('form-add-item');
+        if (form) form.reset();
+        document.getElementById('modal-add-item').style.display = 'flex';
+      });
+    }
+
+    const submitAddItemBtn = document.getElementById('btn-submit-add-item');
+    if (submitAddItemBtn) {
+      submitAddItemBtn.addEventListener('click', () => this.handleAddNewItem());
+    }
+
+    // 16. Packaging Converter Steppers in Modal
     this.bindPackagingModalEvents();
 
-    // 16. Dashboard Action Buttons
+    // 17. Dashboard Action Buttons
     document.getElementById('btn-dash-export').addEventListener('click', () => this.exportCsv());
     document.getElementById('btn-dash-reset').addEventListener('click', () => this.resetDemoData());
     document.getElementById('btn-dash-print').addEventListener('click', () => this.switchView('view-printout'));
 
-    // 17. Import SAP Button
+    // 18. Import SAP Button
     document.getElementById('btn-process-import').addEventListener('click', () => this.processSapImport());
 
-    // 18. Save Admin Settings Button
+    // 19. Save Admin Settings Button
     const saveAdminBtn = document.getElementById('btn-save-admin-settings');
     if (saveAdminBtn) {
       saveAdminBtn.addEventListener('click', () => this.saveAdminSettings());
@@ -690,6 +802,7 @@ class CycleCountApp {
     // Update Printout and Dashboard View
     this.renderPrintout();
     this.renderDashboard();
+    this.updateSettingsDataInfo();
 
     Swal.fire({
       icon: 'success',
@@ -699,8 +812,181 @@ class CycleCountApp {
     });
   }
 
+  // ================= 8B. SETTINGS: DATASET & DUMMY DATA MANAGEMENT =================
+  updateSettingsDataInfo() {
+    const totalEl = document.getElementById('settings-data-total');
+    const summaryEl = document.getElementById('settings-data-summary');
+    if (!totalEl || !summaryEl) return;
+
+    const total = this.items.length;
+    if (total === 0) {
+      totalEl.textContent = '0 SKU (Data Kosong)';
+      summaryEl.textContent = 'Tabel bersih. Siap untuk input manual atau import SAP.';
+      return;
+    }
+
+    let matched = 0;
+    let diff = 0;
+    let totalSap = 0;
+    this.items.forEach(i => {
+      if (i.isCounted()) {
+        if (i.isMatched()) matched++;
+        else diff++;
+      }
+      totalSap += (i.qtySap || 0);
+    });
+
+    totalEl.textContent = `${total} SKU Material`;
+    summaryEl.textContent = `${matched} Cocok \u2022 ${diff} Selisih \u2022 Total SAP: ${totalSap.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
+  }
+
+  clearDummyData() {
+    Swal.fire({
+      title: 'Kosongkan Seluruh Data?',
+      text: 'Semua item SKU dummy akan dihapus (0 item). Tabel akan bersih untuk memulai input data aktual.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Ya, Kosongkan',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#dc2626',
+      customClass: { popup: 'swal-custom-popup' }
+    }).then(result => {
+      if (result.isConfirmed) {
+        this.repo.clearAllItems();
+        this.items = this.repo.items;
+        this.calculateUniqueBins();
+        this.renderDashboard();
+        this.renderActiveBinView();
+        this.renderPrintout();
+        this.updateSettingsDataInfo();
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Data Dikosongkan',
+          text: 'Seluruh data dummy berhasil dihapus (0 SKU). Anda dapat menambah item manual atau melakukan import SAP.',
+          timer: 1600,
+          showConfirmButton: false,
+          customClass: { popup: 'swal-custom-popup' }
+        });
+      }
+    });
+  }
+
+  loadDefaultDummyData() {
+    Swal.fire({
+      title: 'Set / Muat 20 Data Dummy SAP?',
+      text: 'Data saat ini akan digantikan dengan 20 item dummy SAP standar (termasuk 4 studi kasus: normal, selisih kurang, salah BIN, selisih lebih).',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-rotate-left"></i> Ya, Muat Dummy',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#10b981',
+      customClass: { popup: 'swal-custom-popup' }
+    }).then(result => {
+      if (result.isConfirmed) {
+        this.repo.loadDummyData();
+        this.items = this.repo.items;
+        this.calculateUniqueBins();
+        this.renderDashboard();
+        this.renderActiveBinView();
+        this.renderPrintout();
+        this.updateSettingsDataInfo();
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Data Dummy Siap',
+          text: '20 data dummy SAP standar berhasil dimuat ke sistem.',
+          timer: 1500,
+          showConfirmButton: false,
+          customClass: { popup: 'swal-custom-popup' }
+        });
+      }
+    });
+  }
+
+  handleAddNewItem() {
+    const bin = document.getElementById('add-item-bin').value.trim();
+    const matCode = document.getElementById('add-item-code').value.trim();
+    const matDesc = document.getElementById('add-item-desc').value.trim();
+    const batchSap = document.getElementById('add-item-batch-sap').value.trim();
+    const batchFisik = document.getElementById('add-item-batch-fisik').value.trim() || batchSap;
+    const qtySap = parseFloat(document.getElementById('add-item-qty-sap').value);
+    const picking = parseFloat(document.getElementById('add-item-qty-picking').value) || 0;
+    const uom = document.getElementById('add-item-uom').value.trim() || 'KG';
+    const expDate = document.getElementById('add-item-exp').value.trim() || '';
+
+    if (!bin || !matCode || !matDesc || !batchSap || isNaN(qtySap)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Form Belum Lengkap',
+        text: 'Mohon lengkapi alamat BIN, Kode Material, Deskripsi, Batch SAP, dan Qty SAP.',
+        customClass: { popup: 'swal-custom-popup' }
+      });
+      return;
+    }
+
+    const newItem = new CycleCountItem({
+      no: this.items.length + 1,
+      bin,
+      materialNumber: matCode,
+      materialDesc: matDesc,
+      batchFisik,
+      batchSap,
+      expDate,
+      uom,
+      qtySap,
+      pickingQty: picking,
+      status: 'PENDING'
+    });
+
+    this.repo.addItem(newItem);
+    this.items = this.repo.items;
+    this.calculateUniqueBins();
+    this.renderDashboard();
+    this.renderActiveBinView();
+    this.renderPrintout();
+    this.updateSettingsDataInfo();
+
+    // Reset Form & Close Modal
+    const form = document.getElementById('form-add-item');
+    if (form) form.reset();
+    document.getElementById('modal-add-item').style.display = 'none';
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Item Ditambahkan',
+      text: `Material ${matCode} (${matDesc}) berhasil ditambahkan ke rak ${bin}.`,
+      timer: 1600,
+      showConfirmButton: false,
+      customClass: { popup: 'swal-custom-popup' }
+    });
+  }
+
   // ================= 9. CHECKER ACTIVE BIN VIEW RENDERING =================
   renderActiveBinView() {
+    if (this.items.length === 0) {
+      document.getElementById('display-active-bin').textContent = '-';
+      document.getElementById('display-active-bin-counter').textContent = 'Data Kosong (0 Item)';
+      document.getElementById('btn-prev-bin').disabled = true;
+      document.getElementById('btn-next-bin').disabled = true;
+      document.getElementById('checker-focus-container').style.display = 'none';
+      document.getElementById('checker-list-container').style.display = 'flex';
+      document.getElementById('checker-list-container').innerHTML = `
+        <div style="background: var(--surface-main); border: 1px dashed var(--border-strong); border-radius: var(--radius-md); padding: 2.5rem 1.5rem; text-align: center; width: 100%;">
+          <i class="fa-solid fa-boxes-stacked" style="font-size: 2.5rem; color: var(--text-subtle); margin-bottom: 0.75rem;"></i>
+          <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem;">Belum Ada Data Rak &amp; Material</h4>
+          <p style="font-size: 0.82rem; color: var(--text-muted); max-width: 400px; margin: 0 auto 1.25rem;">Dataset saat ini kosong. Anda dapat memuat 20 data dummy SAP standar di Pengaturan atau melakukan Import dari file SAP ALV.</p>
+          <button class="btn-core btn-primary" id="btn-empty-load-dummy">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Muat 20 Data Dummy SAP</span>
+          </button>
+        </div>
+      `;
+      const emptyBtn = document.getElementById('btn-empty-load-dummy');
+      if (emptyBtn) emptyBtn.addEventListener('click', () => this.loadDefaultDummyData());
+      return;
+    }
+
     const currentBin = this.getCurrentBin();
     const binItems = this.getItemsInCurrentBin();
 

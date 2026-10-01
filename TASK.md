@@ -91,15 +91,22 @@
   - `CycleCountRepository`: Model manajemen persistensi lokal dan cloud replication.
   - `AuthManager`: Model sesi autentikasi dan pengecekan wewenang peran (RBAC).
 - [x] **Sistem Login Session & Pembatasan Otoritas (RBAC):**
-  - Layar Login Modal (`#modal-auth-login`) saat belum ada sesi aktif.
-  - **ADMIN / SPV:** Akses penuh (Dashboard, Scanner, Cetak BA, Import SAP, **Pengaturan Admin**).
+  - Layar Login Modal (`#modal-auth-login`) saat belum ada sesi aktif atau saat beralih akun.
+  - Aksesibilitas sesi cepat: Klik chip akun di navbar atau menu Pengaturan langsung membuka dialog ganti sesi 1 sentuhan.
+  - **ADMIN / SPV:** Akses penuh (Dashboard, Scanner, Cetak BA, Import SAP, **Pengaturan Admin & Dataset**).
   - **CHECKER:** Khusus akses **Mobile Scanner** (penghitungan fisik rak BIN).
   - **AUDITOR / ACCOUNTING:** Khusus akses **Table Editor (View-only)** dan **Cetak Berita Acara**.
-  - Tombol Logout di navbar dengan konfirmasi SweetAlert2.
-- [x] **Panel Pengaturan Kustomisasi Administrator (`view-settings`):**
-  - Form kustomisasi nama & jabatan 4 penandatangan Berita Acara (Checker, SPV, Controller, Accounting).
-  - Form kustomisasi nama PT pada kop dokumen Berita Acara dan target akurasi standar audit IRA (%).
-  - Zero Hardcode: Perubahan langsung mengupdate model OOP dan dokumen cetak Berita Acara seketika.
+  - Tombol Logout di navbar dan di panel Pengaturan dengan konfirmasi SweetAlert2.
+- [x] **Panel Pengaturan Terbuka & Manajemen Dataset Dummy (`view-settings`):**
+  - **Navigasi Permanen:** Tab Pengaturan selalu dapat diakses baik dari desktop top navbar maupun mobile bottom bar (`bnav-settings`).
+  - **Card 1 (Sesi Pengguna & Otoritas):** Menampilkan profil pengguna aktif, status wewenang operasional, tombol Ganti Profil Sesi, dan tombol Logout.
+  - **Card 2 (Manajemen Data Item & Dataset Dummy):**
+    - Tombol Merah `Hapus Data Dummy (Kosongkan)` untuk membersihkan seluruh data (0 SKU) siap input opname aktual.
+    - Tombol Hijau `Set / Muat 20 Data Dummy SAP` untuk memuat ulang 20 item simulasi lengkap 4 skenario industri.
+    - Tombol Biru `Tambah SKU Baru Manual` (`modal-add-item`) untuk input data material baru tanpa import file.
+    - Penanganan Empty State ramah pengguna pada layar mobile checker dan desktop table.
+  - **Card 3 (Kustomisasi Tanda Tangan):** Form 4 penandatangan Berita Acara tanpa hardcode.
+  - **Card 4 (Profil Lembaga & Standar Audit):** Nama PT kop dokumen dan target akurasi stok IRA (%).
 - [x] **Pembersihan Modal Supabase di Frontend:**
   - Menghapus modal konfigurasi Supabase dari UI agar tidak membingungkan operator.
   - Koneksi database berjalan otomatis di latar belakang (*silent backend connection*).

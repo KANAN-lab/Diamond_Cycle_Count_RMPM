@@ -403,6 +403,23 @@ class CycleCountRepository {
     );
   }
 
+  clearAllItems() {
+    this.items = [];
+    this.saveItems();
+  }
+
+  loadDummyData() {
+    this.items = INITIAL_ITEMS.map(i => CycleCountItem.fromJSON(i));
+    this.saveItems();
+  }
+
+  addItem(item) {
+    const itemObj = (item instanceof CycleCountItem) ? item : CycleCountItem.fromJSON(item);
+    this.items.push(itemObj);
+    this.saveItems();
+    return itemObj;
+  }
+
   resetDemoData() {
     this.items = INITIAL_ITEMS.map(i => CycleCountItem.fromJSON(i));
     this.signatureMatrix = SignatureMatrix.createDefault();
