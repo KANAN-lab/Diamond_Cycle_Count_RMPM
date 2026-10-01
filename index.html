@@ -3,224 +3,157 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>RMPM Cycle Count System - Mobile WMS</title>
+  <title>RMPM Cycle Count - Supabase Studio Edition</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <!-- ================= 1. MOBILE-FIRST COMPACT HEADER ================= -->
-  <header class="app-header">
-    <div class="header-inner">
-      <div class="brand-section">
-        <span class="brand-badge">RMPM</span>
-        <div>
-          <div class="brand-title">Cycle Count</div>
-          <div class="brand-subtitle">Warehouse & Inventory Accuracy</div>
+  <!-- ================= 1. SUPABASE STUDIO HEADER ================= -->
+  <header class="sb-header">
+    <div class="sb-header-inner">
+      <div class="sb-brand-group">
+        <div class="sb-logo-box">⚡</div>
+        <div class="sb-breadcrumb">
+          <span class="sb-bc-org">Diamond RMPM</span>
+          <span class="sb-bc-divider">/</span>
+          <span class="sb-bc-proj">Cycle Count Database</span>
+          <span class="sb-bc-divider">/</span>
+          <span style="color: var(--sb-text-med); font-size: 0.8rem;" id="header-date">21-Sep-2026</span>
         </div>
       </div>
 
-      <div class="header-meta">
-        <!-- Cloud / Supabase Status Pill -->
-        <button id="btn-supabase-status" class="meta-pill" style="cursor: pointer;" title="Koneksi Supabase Cloud">
-          <span id="sb-status-dot">🟡</span>
-          <span id="sb-status-text">Supabase</span>
+      <div class="sb-header-actions">
+        <!-- Supabase Realtime Status Pill -->
+        <button id="btn-supabase-status" class="sb-pill-btn" title="Koneksi Realtime Database Supabase">
+          <span id="sb-status-dot">🟢</span>
+          <span id="sb-status-text">Supabase: Online</span>
         </button>
 
-        <!-- Active User & Role Chip -->
-        <div class="user-switch-bar" id="btn-open-user-modal" title="Ketuk untuk Ganti Akun">
-          <div class="user-avatar" id="user-avatar-initial">A</div>
-          <div class="user-info">
-            <span class="user-name" id="current-user-name">Asep S.</span>
-            <span class="user-role-badge" id="current-user-role">SPV / ADMIN</span>
+        <!-- User Role Switcher -->
+        <div class="sb-user-chip" id="btn-open-user-modal" title="Klik untuk Ganti Akun Pengguna">
+          <div class="sb-user-avatar" id="user-avatar-initial">A</div>
+          <div style="display: flex; flex-direction: column; line-height: 1.1;">
+            <span class="sb-user-name" id="current-user-name">Asep Saepullah</span>
+            <span class="sb-user-role" id="current-user-role">SPV / ADMIN</span>
           </div>
-          <button class="btn-switch-user">▾</button>
+          <span style="font-size: 0.7rem; color: var(--sb-text-low);">▾</span>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- ================= DESKTOP TABS (HIDDEN ON PHONE, VISIBLE >= 768px) ================= -->
-  <nav class="nav-tab-container" style="display: none;">
-    <div style="max-width: 1440px; margin: 0 auto; display: flex; padding: 0 1rem; gap: 0.5rem;">
-      <button class="btn btn-secondary nav-tab active" data-target="view-checker" id="dtab-checker">
-        📱 Mode Hitung Lapangan (Checker)
+  <!-- ================= 2. SUPABASE STUDIO SUB-NAVIGATION ================= -->
+  <nav class="sb-subnav">
+    <div class="sb-subnav-inner">
+      <button class="sb-tab active" data-target="view-dashboard" id="tab-dashboard">
+        <span>📊 Table Editor (Rekonsiliasi)</span>
+        <span class="sb-tab-badge" id="tab-count-badge">20</span>
       </button>
-      <button class="btn btn-secondary nav-tab" data-target="view-dashboard" id="dtab-dashboard">
-        📊 Dashboard & Rekonsiliasi Master
+      <button class="sb-tab" data-target="view-checker" id="tab-checker">
+        <span>📱 Mobile Scanner (Checker Mode)</span>
       </button>
-      <button class="btn btn-secondary nav-tab" data-target="view-printout" id="dtab-printout">
-        🖨️ Cetak Berita Acara (Sign-Off ACC & WH)
+      <button class="sb-tab" data-target="view-printout" id="tab-printout">
+        <span>🖨️ Cetak Berita Acara (Sign-Off ACC & WH)</span>
       </button>
-      <button class="btn btn-secondary nav-tab" data-target="view-import" id="dtab-import">
-        📥 Import Jadwal SAP
+      <button class="sb-tab" data-target="view-import" id="tab-import">
+        <span>📥 Import ALV Grid SAP</span>
       </button>
     </div>
   </nav>
 
-  <!-- ================= 2. LOCATION & RACK CONTROL STRIP ================= -->
-  <section class="location-strip" id="global-location-strip">
-    <div class="location-strip-inner">
-      <!-- BIN Stepper Row -->
-      <div class="bin-stepper-row">
-        <button class="btn-nav-bin" id="btn-prev-bin">◀ Rak Sblm</button>
-        
-        <div class="active-bin-box" id="bin-selector-trigger" title="Pilih BIN">
-          <span class="active-bin-title" id="display-active-bin">B.01B.2.01</span>
-          <span class="active-bin-counter" id="display-active-bin-counter">Item 1 dari 1 di rak ini</span>
-        </div>
+  <!-- ================= 3. SPACIOUS MAIN CONTENT ================= -->
+  <main class="sb-content">
 
-        <button class="btn-nav-bin" id="btn-next-bin">Rak Lanjut ▶</button>
-      </div>
-
-      <!-- Quick Search / Barcode & Display Mode Toggle -->
-      <div class="search-bar-row">
-        <input type="text" id="mobile-barcode-search" class="mobile-search-input" placeholder="🔍 Scan Barcode / Ketik BIN / Batch / Kode...">
-        
-        <button class="mode-toggle-btn active" id="btn-toggle-focus-mode" title="Beralih antara Mode Fokus Satuan atau Mode List">
-          🎯 Mode Fokus
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= MAIN CONTENT APP ================= -->
-  <main class="app-content">
-
-    <!-- ================= VIEW 1: CHECKER FIELD COUNT (PRIMARY MOBILE VIEW) ================= -->
-    <section class="view-section active" id="view-checker">
+    <!-- ================= VIEW 1: MASTER DASHBOARD & TABLE EDITOR ================= -->
+    <section class="view-section active" id="view-dashboard">
       
-      <!-- MODE A: GUIDED WALKTHROUGH (ZEBRA HANDHELD SCANNER STYLE) -->
-      <div id="checker-focus-container" style="display: block;">
-        <div class="focus-walkthrough-card" id="focus-item-card">
-          <!-- Populated by JS -->
-          <div class="focus-card-meta-top">
-            <span class="badge-bin" id="fc-bin">B.01B.2.01</span>
-            <div id="fc-status-badge"><span class="badge badge-discrepancy">SELISIH</span></div>
+      <!-- Minimalist Stat Cards (Spacious, Un-Cramped) -->
+      <div class="sb-kpi-grid">
+        <div class="sb-stat-card brand-glow">
+          <span class="sb-stat-label">Akurasi Stok (IRA)</span>
+          <div class="sb-stat-value-row">
+            <span class="sb-stat-number" id="dash-ira-rate" style="color: var(--sb-brand);">80.0%</span>
+            <span class="sb-stat-meta" id="dash-ira-count">(16 Cocok)</span>
           </div>
+          <span class="sb-stat-meta">Target Standar Audit: &ge; 98.0%</span>
+        </div>
 
-          <div class="focus-mat-desc" id="fc-mat-desc">MONO & DI GLYCERIDE (DMG 0097)</div>
-          <div class="focus-mat-code">Kode Material SAP: <strong id="fc-mat-code">40000210</strong> &bull; Satuan: <strong id="fc-uom">KG</strong></div>
-
-          <!-- High-Contrast Spec Grid -->
-          <div class="focus-spec-grid">
-            <div class="spec-cell highlight-batch">
-              <span>Batch Fisik / Vendor</span>
-              <strong id="fc-batch-fisik">25391003-PALSGA</strong>
-            </div>
-            <div class="spec-cell">
-              <span>Batch SAP</span>
-              <strong id="fc-batch-sap">4000079065</strong>
-            </div>
-            <div class="spec-cell">
-              <span>Expired Date</span>
-              <strong id="fc-exp-date">22-Sep-27</strong>
-            </div>
-            <div class="spec-cell">
-              <span>Picking Reservasi</span>
-              <strong id="fc-picking">0.000 KG</strong>
-            </div>
+        <div class="sb-stat-card danger-glow">
+          <span class="sb-stat-label">Item Discrepancy (Selisih)</span>
+          <div class="sb-stat-value-row">
+            <span class="sb-stat-number" id="dash-diff-items" style="color: var(--sb-danger);">4 Item</span>
           </div>
+          <span class="sb-stat-meta" id="dash-net-variance" style="color: var(--sb-danger); font-weight: 600;">Net Selisih: -667.60 KG</span>
+        </div>
 
-          <!-- Target vs Actual -->
-          <div class="focus-target-box">
-            <div>
-              <div class="target-figure-label">Target Bersih (SAP - Pick)</div>
-              <div class="target-figure-val" id="fc-target-net">500.000 KG</div>
-              <div style="font-size: 0.68rem; color: var(--text-muted);">(SAP: <span id="fc-sap-raw">500.00</span> KG)</div>
-            </div>
-            <div>
-              <div class="target-figure-label" style="text-align: right;">Hasil Fisik Aktual</div>
-              <div class="actual-figure-val" id="fc-actual-val">380.000 KG</div>
-              <div style="font-size: 0.68rem; text-align: right; color: var(--status-diff); font-weight: 700;" id="fc-diff-val">Selisih: -120.000 KG</div>
-            </div>
+        <div class="sb-stat-card info-glow">
+          <span class="sb-stat-label">Temuan Salah Lokasi</span>
+          <div class="sb-stat-value-row">
+            <span class="sb-stat-number" id="dash-misplaced-items" style="color: var(--sb-info);">1 Item</span>
           </div>
+          <span class="sb-stat-meta">Perlu Koreksi Transfer Posting SAP</span>
+        </div>
 
-          <!-- Notes / Misplaced Warning -->
-          <div id="fc-notes-box" style="margin-bottom: 1rem; font-size: 0.78rem; background-color: #fefce8; border-left: 4px solid #eab308; padding: 0.5rem 0.65rem; border-radius: var(--radius-sm); color: #713f12;">
-            📝 <strong>Catatan Lapangan:</strong> <span id="fc-note-text">10 Sak KG</span>
+        <div class="sb-stat-card">
+          <span class="sb-stat-label">Total Item Terjadwal</span>
+          <div class="sb-stat-value-row">
+            <span class="sb-stat-number" id="dash-total-items">20</span>
+            <span class="sb-stat-meta">SKU/Batch</span>
           </div>
-
-          <!-- Ergonomic Thumb Action Bar (Zebra Touch Standard) -->
-          <div class="thumb-actions-container">
-            <button class="btn-thumb-match" id="fc-btn-match">
-              <span>✅</span>
-              <span id="fc-btn-match-text">Sesuai Target (500 KG)</span>
-            </button>
-
-            <button class="btn-thumb-input" id="fc-btn-input-calc">
-              <span>✏️</span>
-              <span>Input Fisik / Kalkulator Kemasan</span>
-            </button>
-
-            <button class="btn-thumb-misplaced" id="fc-btn-misplaced">
-              📦 Laporkan Salah Lokasi (Pindah BIN)
-            </button>
-          </div>
-
-          <!-- Item Step Navigator in this BIN -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border-light); font-size: 0.8rem;">
-            <button class="btn btn-secondary btn-sm" id="fc-prev-item" style="min-height: 38px;">◀ Item Sblm</button>
-            <span style="font-weight: 700; color: var(--text-muted);" id="fc-item-step-text">Item 1 dari 1</span>
-            <button class="btn btn-secondary btn-sm" id="fc-next-item" style="min-height: 38px;">Item Lanjut ▶</button>
-          </div>
+          <span class="sb-stat-meta" id="dash-total-sap">Total SAP: 9,286.60 KG</span>
         </div>
       </div>
 
-      <!-- MODE B: LIST VIEW (ALTERNATIVE DENSE CARD LIST) -->
-      <div id="checker-list-container" class="cards-list-view" style="display: none;">
-        <!-- Rendered by JS -->
-      </div>
-    </section>
+      <!-- Table Toolbar (Generous Spacing & Functional Controls) -->
+      <div class="sb-toolbar">
+        <div class="sb-toolbar-left">
+          <div class="sb-search-box">
+            <input type="text" id="dash-search-input" class="sb-input" placeholder="🔍 Cari Kode, BIN, Batch Vendor...">
+          </div>
 
-    <!-- ================= VIEW 2: MASTER DASHBOARD & REKONSILIASI ================= -->
-    <section class="view-section" id="view-dashboard">
-      <!-- KPI Overview Cards -->
-      <div class="kpi-grid">
-        <div style="background: #fff; padding: 1rem; border-radius: var(--radius-sm); border-left: 4px solid var(--brand-blue); box-shadow: var(--shadow-sm); margin-bottom: 0.75rem;">
-          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Akurasi Stok (IRA)</div>
-          <div style="font-size: 1.75rem; font-weight: 900; color: var(--status-match); line-height: 1.1;" id="dash-ira-rate">80.0%</div>
-          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;" id="dash-ira-summary">16 Cocok dari 20 Item (Target &ge; 98%)</div>
+          <select id="dash-filter-bin" class="sb-select">
+            <option value="ALL">Semua BIN / Rak</option>
+            <option value="B.01A">Zona B.01A</option>
+            <option value="B.01B">Zona B.01B</option>
+            <option value="B.02A">Zona B.02A</option>
+            <option value="B.02B">Zona B.02B</option>
+          </select>
+
+          <select id="dash-filter-status" class="sb-select">
+            <option value="ALL">Semua Kondisi</option>
+            <option value="DISCREPANCY">⚠️ Hanya Selisih (Discrepancy)</option>
+            <option value="MATCHED">✅ Hanya Cocok (Matched)</option>
+            <option value="MISPLACED">📦 Pindah Lokasi / Salah BIN</option>
+            <option value="PENDING">⏳ Belum Dihitung</option>
+          </select>
         </div>
 
-        <div style="background: #fff; padding: 1rem; border-radius: var(--radius-sm); border-left: 4px solid var(--status-diff); box-shadow: var(--shadow-sm); margin-bottom: 0.75rem;">
-          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Item Discrepancy (Selisih)</div>
-          <div style="font-size: 1.75rem; font-weight: 900; color: var(--status-diff); line-height: 1.1;" id="dash-diff-items">4 Item</div>
-          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;" id="dash-net-variance">Net Selisih: -667.6 KG</div>
-        </div>
-
-        <div style="background: #fff; padding: 1rem; border-radius: var(--radius-sm); border-left: 4px solid var(--status-reloc); box-shadow: var(--shadow-sm); margin-bottom: 0.75rem;">
-          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Temuan Pindah Lokasi</div>
-          <div style="font-size: 1.75rem; font-weight: 900; color: var(--status-reloc); line-height: 1.1;" id="dash-misplaced-items">1 Item</div>
-          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">Perlu Koreksi Transfer Posting SAP</div>
+        <div class="sb-toolbar-right">
+          <button class="sb-btn sb-btn-secondary" id="btn-dash-export">📤 Export CSV</button>
+          <button class="sb-btn sb-btn-secondary" id="btn-dash-reset" title="Kembalikan ke data 20 baris lembar fisik">🔄 Reset Data Contoh</button>
+          <button class="sb-btn sb-btn-primary" id="btn-dash-print">🖨️ Cetak Berita Acara</button>
         </div>
       </div>
 
-      <!-- Quick Actions Bar -->
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-        <button class="btn btn-secondary btn-sm" id="btn-dash-export">📤 Export CSV</button>
-        <button class="btn btn-secondary btn-sm" id="btn-dash-reset">🔄 Reset Data Contoh</button>
-        <button class="btn btn-primary btn-sm" id="btn-dash-print">🖨️ Cetak Berita Acara</button>
-      </div>
-
-      <!-- Desktop Master Table -->
-      <div class="table-responsive">
-        <table class="master-table">
+      <!-- Supabase Table Editor Grid (Spacious, No Cramping) -->
+      <div class="sb-table-container">
+        <table class="sb-table" id="master-table">
           <thead>
             <tr>
-              <th style="width: 35px; text-align: center;">No</th>
-              <th>BIN</th>
-              <th>Kode</th>
-              <th>Material Description</th>
-              <th>Batch Vendor</th>
-              <th>Batch SAP</th>
-              <th style="text-align: right;">SAP (KG)</th>
-              <th style="text-align: right;">Picking</th>
-              <th style="text-align: right;">Target</th>
-              <th style="text-align: right;">Aktual</th>
-              <th style="text-align: right;">Variance</th>
-              <th style="text-align: center;">Status</th>
-              <th>Catatan</th>
-              <th style="text-align: center;">Aksi</th>
+              <th style="width: 45px; text-align: center;">No</th>
+              <th style="width: 110px;">BIN</th>
+              <th style="width: 95px;">Kode Mat</th>
+              <th>Deskripsi Material</th>
+              <th style="width: 150px;">Batch Fisik Vendor</th>
+              <th style="width: 110px;">Batch SAP</th>
+              <th style="width: 90px; text-align: right;">SAP (KG)</th>
+              <th style="width: 80px; text-align: right;">Picking</th>
+              <th style="width: 90px; text-align: right;">Target Net</th>
+              <th style="width: 95px; text-align: right;">Fisik Aktual</th>
+              <th style="width: 95px; text-align: right;">Variance</th>
+              <th style="width: 110px; text-align: center;">Status</th>
+              <th>Catatan Lapangan</th>
+              <th style="width: 80px; text-align: center;">Aksi</th>
             </tr>
           </thead>
           <tbody id="dash-master-tbody">
@@ -228,13 +161,124 @@
           </tbody>
         </table>
       </div>
+
+    </section>
+
+    <!-- ================= VIEW 2: MOBILE SCANNER (CHECKER MODE) ================= -->
+    <section class="view-section" id="view-checker">
+      
+      <!-- Location Control Bar -->
+      <div class="sb-loc-bar">
+        <div class="sb-bin-stepper">
+          <button class="sb-btn sb-btn-secondary" id="btn-prev-bin" style="min-height: 48px; padding: 0 1rem;">◀ Rak Sblm</button>
+          
+          <div class="sb-bin-display">
+            <span class="sb-bin-active-code" id="display-active-bin">B.01B.2.01</span>
+            <span class="sb-bin-meta-info" id="display-active-bin-counter">Rak 1 dari 8 &bull; 1 Item</span>
+          </div>
+
+          <button class="sb-btn sb-btn-secondary" id="btn-next-bin" style="min-height: 48px; padding: 0 1rem;">Rak Lanjut ▶</button>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="text" id="mobile-barcode-search" class="sb-input" placeholder="🔍 Scan Barcode / Ketik BIN / Batch / Kode...">
+          <button class="sb-btn sb-btn-secondary" id="btn-toggle-focus-mode">🎯 Mode Fokus</button>
+        </div>
+      </div>
+
+      <!-- Mode A: Guided Walkthrough Card -->
+      <div id="checker-focus-container" style="display: block; margin-top: 1rem;">
+        <div class="sb-focus-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="sb-badge-bin" id="fc-bin">B.01B.2.01</span>
+            <div id="fc-status-badge"><span class="sb-badge sb-badge-diff">SELISIH</span></div>
+          </div>
+
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: #fff;" id="fc-mat-desc">MONO & DI GLYCERIDE (DMG 0097)</div>
+            <div style="font-size: 0.8rem; color: var(--sb-text-med); margin-top: 0.2rem;">
+              Kode Material SAP: <strong id="fc-mat-code" class="font-mono">40000210</strong> &bull; Satuan: <strong id="fc-uom">KG</strong>
+            </div>
+          </div>
+
+          <!-- Spec Box -->
+          <div class="sb-focus-spec-box">
+            <div class="sb-spec-cell">
+              <span>Batch Fisik Vendor</span>
+              <strong id="fc-batch-fisik" style="color: var(--sb-info); font-size: 1rem;">25391003-PALSGA</strong>
+            </div>
+            <div class="sb-spec-cell">
+              <span>Batch SAP</span>
+              <strong id="fc-batch-sap">4000079065</strong>
+            </div>
+            <div class="sb-spec-cell">
+              <span>Expired Date</span>
+              <strong id="fc-exp-date">22-Sep-27</strong>
+            </div>
+            <div class="sb-spec-cell">
+              <span>Picking Reservasi</span>
+              <strong id="fc-picking">0.000 KG</strong>
+            </div>
+          </div>
+
+          <!-- Target vs Actual -->
+          <div class="sb-focus-target-bar">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--sb-text-low); text-transform: uppercase;">Target Bersih (SAP - Pick)</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: #fff;" id="fc-target-net" class="font-mono">500.000 KG</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.72rem; color: var(--sb-text-low); text-transform: uppercase;">Hasil Fisik Aktual</div>
+              <div style="font-size: 1.6rem; font-weight: 900; color: var(--sb-brand);" id="fc-actual-val" class="font-mono">380.000 KG</div>
+              <div style="font-size: 0.75rem; color: var(--sb-danger); font-weight: 700;" id="fc-diff-val">Selisih: -120.000 KG</div>
+            </div>
+          </div>
+
+          <!-- Field Notes -->
+          <div id="fc-notes-box" style="background-color: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--sb-warning); padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); font-size: 0.8rem; color: var(--sb-warning);">
+            📝 <strong>Catatan Lapangan:</strong> <span id="fc-note-text">10 Sak KG</span>
+          </div>
+
+          <!-- Thumb Action Buttons (Industrial Zebra Ergonomics) -->
+          <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.5rem;">
+            <button class="sb-btn sb-btn-primary" id="fc-btn-match" style="min-height: 52px; font-size: 1rem;">
+              <span>✅</span>
+              <span id="fc-btn-match-text">Sesuai Target (500 KG)</span>
+            </button>
+
+            <button class="sb-btn sb-btn-secondary" id="fc-btn-input-calc" style="min-height: 48px; font-size: 0.95rem;">
+              <span>✏️</span>
+              <span>Input Fisik / Kalkulator Kemasan</span>
+            </button>
+
+            <button id="fc-btn-misplaced" style="background: none; border: none; color: var(--sb-info); font-size: 0.8rem; font-weight: 700; cursor: pointer; padding: 0.5rem; text-align: center;">
+              📦 Laporkan Salah Lokasi (Pindah BIN)
+            </button>
+          </div>
+
+          <!-- Stepper inside rack -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--sb-border); padding-top: 0.75rem; margin-top: 0.5rem; font-size: 0.8rem;">
+            <button class="sb-btn sb-btn-secondary sb-btn-sm" id="fc-prev-item">◀ Item Sblm</button>
+            <span style="color: var(--sb-text-med); font-weight: 600;" id="fc-item-step-text">Item 1 dari 1</span>
+            <button class="sb-btn sb-btn-secondary sb-btn-sm" id="fc-next-item">Item Lanjut ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode B: Card List -->
+      <div id="checker-list-container" style="display: none; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+        <!-- Rendered by JS -->
+      </div>
     </section>
 
     <!-- ================= VIEW 3: CETAK BERITA ACARA RESMI (A4 LANDSCAPE) ================= -->
     <section class="view-section" id="view-printout">
-      <div class="print-actions-bar" style="background: #fff; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-size: 0.85rem; font-weight: 700;">Dokumen Berita Acara Cycle Count</div>
-        <button class="btn btn-primary" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+      <div class="sb-toolbar" style="margin-bottom: 1.5rem;">
+        <div>
+          <strong style="color: #fff; font-size: 0.95rem;">Dokumen Berita Acara Rekonsiliasi Cycle Count</strong>
+          <p style="font-size: 0.75rem; color: var(--sb-text-med); margin: 0;">Format resmi A4 Landscape dengan matriks 4 tanda tangan (Checker, SPV, Inventory Control, Accounting).</p>
+        </div>
+        <button class="sb-btn sb-btn-primary" onclick="window.print()">🖨️ Cetak Dokumen / Simpan PDF</button>
       </div>
 
       <div class="print-document-sheet">
@@ -260,7 +304,7 @@
               <th style="width: 75px;">BIN</th>
               <th style="width: 65px;">Kode Mat</th>
               <th>Deskripsi Material</th>
-              <th style="width: 100px;">Batch Fisik</th>
+              <th style="width: 105px;">Batch Fisik</th>
               <th style="width: 80px;">Batch SAP</th>
               <th style="width: 55px; text-align: right;">SAP</th>
               <th style="width: 50px; text-align: right;">Picking</th>
@@ -302,153 +346,159 @@
       </div>
     </section>
 
-    <!-- ================= VIEW 4: IMPORT SAP DATA ================= -->
+    <!-- ================= VIEW 4: IMPORT DATA SAP ================= -->
     <section class="view-section" id="view-import">
-      <div style="background: #fff; padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
-        <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem;">Import Jadwal Data SAP</h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Salin langsung tabel dari Excel / SAP dan tempelkan di kotak berikut:</p>
-        <textarea id="import-text-data" rows="8" class="form-input" style="font-family: var(--font-mono); font-size: 0.78rem;" placeholder="BIN	Material Number	Batch SAP	Batch Fisik	Exp. Date	Material Description	UoM	Qty SAP	Picking"></textarea>
+      <div class="sb-stat-card">
+        <h3 style="font-size: 1.05rem; color: #fff; margin-bottom: 0.35rem;">Import Jadwal ALV Grid SAP</h3>
+        <p style="font-size: 0.8rem; color: var(--sb-text-med); margin-bottom: 1rem;">
+          Salin langsung tabel dari Excel / SAP ALV Grid dan tempelkan di kotak berikut:
+        </p>
+        <textarea id="import-text-data" rows="8" class="sb-input" style="height: auto; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.85rem;" placeholder="BIN	Material Number	Batch SAP	Batch Fisik	Exp. Date	Material Description	UoM	Qty SAP	Picking"></textarea>
         <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
-          <button class="btn btn-primary" id="btn-process-import">Proses Import Jadwal</button>
+          <button class="sb-btn sb-btn-primary" id="btn-process-import">📥 Proses & Muat Jadwal Baru</button>
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- ================= 3. MOBILE FIXED BOTTOM NAVIGATION BAR ================= -->
-  <nav class="bottom-nav-bar" id="mobile-bottom-nav">
-    <button class="bnav-btn active" data-target="view-checker">
-      <span class="bnav-icon">📱</span>
+  <!-- ================= 4. MOBILE BOTTOM NAVIGATION ================= -->
+  <nav class="sb-bottom-bar">
+    <button class="sb-bnav-item" data-target="view-checker">
+      <span style="font-size: 1.15rem;">📱</span>
       <span>Hitung</span>
     </button>
-    <button class="bnav-btn" data-target="view-dashboard">
-      <span class="bnav-icon">📊</span>
-      <span>Rekap</span>
+    <button class="sb-bnav-item active" data-target="view-dashboard">
+      <span style="font-size: 1.15rem;">📊</span>
+      <span>Tabel</span>
     </button>
-    <button class="bnav-btn" data-target="view-printout">
-      <span class="bnav-icon">🖨️</span>
+    <button class="sb-bnav-item" data-target="view-printout">
+      <span style="font-size: 1.15rem;">🖨️</span>
       <span>Cetak BA</span>
     </button>
-    <button class="bnav-btn" data-target="view-import">
-      <span class="bnav-icon">📥</span>
+    <button class="sb-bnav-item" data-target="view-import">
+      <span style="font-size: 1.15rem;">📥</span>
       <span>Import</span>
     </button>
   </nav>
 
-  <!-- ================= MODAL: PACKAGING CALCULATOR & BOTTOM SHEET ================= -->
-  <div class="modal-overlay" id="modal-checker-input" style="display: none;">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title">✏️ Input Fisik & Kemasan</h3>
-        <button class="btn-close-modal" data-close="modal-checker-input">&times;</button>
+  <!-- ================= 5. PACKAGING CALCULATOR MODAL ================= -->
+  <div class="sb-modal-overlay" id="modal-checker-input" style="display: none;">
+    <div class="sb-modal-content">
+      <div class="sb-modal-header">
+        <h3 style="font-size: 1rem; font-weight: 800; color: #fff;">✏️ Input Fisik & Kalkulator Kemasan</h3>
+        <button class="sb-btn sb-btn-secondary sb-btn-sm" data-close="modal-checker-input">&times;</button>
       </div>
 
-      <div class="modal-body">
-        <!-- Target Info Pill -->
-        <div style="background-color: var(--bg-surface-subtle); border: 1px solid var(--border-light); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem;">
-          <div><strong id="m-item-desc">MATERIAL NAME</strong> (<span id="m-item-code">40000000</span>)</div>
-          <div style="color: var(--text-muted); font-size: 0.72rem; margin-top: 0.2rem;">
-            Target Bersih: <strong id="m-item-net" style="color: var(--brand-blue); font-size: 0.85rem;">500.000 KG</strong> &bull; Batch: <strong id="m-item-batch-fisik">LOT</strong>
+      <div class="sb-modal-body">
+        <!-- Target Info -->
+        <div style="background-color: var(--sb-canvas); border: 1px solid var(--sb-border); padding: 0.75rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem;">
+          <div><strong id="m-item-desc" style="color: #fff;">MATERIAL NAME</strong> (<span id="m-item-code" class="font-mono">40000000</span>)</div>
+          <div style="color: var(--sb-text-med); font-size: 0.72rem; margin-top: 0.25rem;">
+            Target Bersih: <strong id="m-item-net" style="color: var(--sb-brand);" class="font-mono">500.000 KG</strong> &bull; Batch: <strong id="m-item-batch-fisik" class="font-mono">LOT</strong>
           </div>
         </div>
 
-        <!-- Packaging Converter Stepper -->
-        <div class="calc-pack-box">
-          <div style="font-size: 0.75rem; font-weight: 700; color: var(--brand-navy);">🧮 Hitung Cepat Kemasan Fisik:</div>
+        <!-- Stepper Box -->
+        <div style="background-color: var(--sb-canvas); border: 1px solid var(--sb-border); border-radius: var(--radius-sm); padding: 0.85rem;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: var(--sb-text-med); margin-bottom: 0.5rem;">🧮 Hitung Cepat Kemasan (Sak / Box / Drum):</div>
           
-          <!-- Preset Buttons -->
-          <div class="pack-presets-grid">
-            <button type="button" class="btn-pack-preset active" data-weight="25">Sak 25 KG</button>
-            <button type="button" class="btn-pack-preset" data-weight="20">Sak 20 KG</button>
-            <button type="button" class="btn-pack-preset" data-weight="17.5">Box 17.5 KG</button>
-            <button type="button" class="btn-pack-preset" data-weight="12">Box 12 KG</button>
-            <button type="button" class="btn-pack-preset" data-weight="200">Drum 200 KG</button>
-            <button type="button" class="btn-pack-preset" data-weight="custom">Lainnya...</button>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-bottom: 0.65rem;">
+            <button type="button" class="sb-btn sb-btn-secondary sb-btn-sm btn-pack-preset active" data-weight="25">Sak 25 KG</button>
+            <button type="button" class="sb-btn sb-btn-secondary sb-btn-sm btn-pack-preset" data-weight="20">Sak 20 KG</button>
+            <button type="button" class="sb-btn sb-btn-secondary sb-btn-sm btn-pack-preset" data-weight="17.5">Box 17.5 KG</button>
+            <button type="button" class="sb-btn sb-btn-secondary sb-btn-sm btn-pack-preset" data-weight="12">Box 12 KG</button>
+            <button type="button" class="sb-btn sb-btn-secondary sb-btn-sm btn-pack-preset" data-weight="200">Drum 200 KG</button>
+            <button type="button" class="sb-btn sb-btn-secondary sb-btn-sm btn-pack-preset" data-weight="custom">Lainnya...</button>
           </div>
 
-          <!-- Stepper for pack count -->
-          <div class="pack-stepper-row">
-            <button type="button" class="btn-stepper" id="btn-pack-minus">-</button>
-            <input type="number" id="calc-pack-qty" class="stepper-input" placeholder="0 Sak">
-            <button type="button" class="btn-stepper" id="btn-pack-plus">+</button>
+          <!-- Stepper -->
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" class="sb-btn sb-btn-secondary" id="btn-pack-minus" style="width: 44px; height: 44px; font-size: 1.25rem;">-</button>
+            <input type="number" id="calc-pack-qty" class="sb-input font-mono" style="text-align: center; font-size: 1.2rem; font-weight: 800; height: 44px;" placeholder="0 Sak">
+            <button type="button" class="sb-btn sb-btn-secondary" id="btn-pack-plus" style="width: 44px; height: 44px; font-size: 1.25rem;">+</button>
           </div>
 
-          <!-- Loose / Partial kg -->
           <div style="margin-top: 0.65rem; display: flex; align-items: center; gap: 0.5rem;">
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">+ Sisa Parsial (KG):</label>
-            <input type="number" step="0.1" id="calc-pack-partial" class="form-input" style="min-height: 40px; padding: 0.3rem 0.5rem;" placeholder="0.0">
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--sb-text-med); white-space: nowrap;">+ Sisa Parsial (KG):</label>
+            <input type="number" step="0.1" id="calc-pack-partial" class="sb-input" style="height: 38px;" placeholder="0.0">
           </div>
         </div>
 
         <!-- Total Actual Input -->
-        <div class="form-group">
-          <label class="form-label" for="input-actual-qty">Total Fisik Aktual (KG): <span style="color:red;">*</span></label>
-          <input type="number" step="0.001" id="input-actual-qty" class="form-input" style="font-size: 1.25rem; font-weight: 900; color: var(--brand-blue); text-align: center;" placeholder="0.000">
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: var(--sb-text-high); display: block; margin-bottom: 0.35rem;">
+            Total Fisik Aktual (KG): <span style="color: var(--sb-danger);">*</span>
+          </label>
+          <input type="number" step="0.001" id="input-actual-qty" class="sb-input font-mono" style="height: 48px; font-size: 1.4rem; font-weight: 900; color: var(--sb-brand); text-align: center;" placeholder="0.000">
         </div>
 
         <!-- Misplaced Checkbox -->
-        <div style="background-color: var(--bg-surface-subtle); padding: 0.65rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
+        <div style="background-color: var(--sb-canvas); border: 1px solid var(--sb-border); padding: 0.75rem; border-radius: var(--radius-sm);">
           <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
             <input type="checkbox" id="check-is-misplaced">
             <span>Barang Pindah BIN / Salah Rak</span>
           </label>
           <div id="misplaced-input-box" style="display: none; margin-top: 0.5rem;">
-            <input type="text" id="input-new-bin" class="form-input" placeholder="Masukkan BIN baru, misal: B.01A.5.01" style="font-family: var(--font-mono); min-height: 40px;">
+            <input type="text" id="input-new-bin" class="sb-input font-mono" placeholder="Contoh: B.01A.5.01">
           </div>
         </div>
 
         <!-- Notes -->
-        <div class="form-group">
-          <label class="form-label" for="input-item-note">Catatan / Kondisi Fisik:</label>
-          <input type="text" id="input-item-note" class="form-input" placeholder="Contoh: 10 Sak KG, Robek, atau Picking FL-2">
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: var(--sb-text-high); display: block; margin-bottom: 0.35rem;">Catatan Lapangan & Kondisi:</label>
+          <input type="text" id="input-item-note" class="sb-input" placeholder="Contoh: 10 Sak KG, Kemasan robek, atau Picking FL-2">
         </div>
       </div>
 
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-close="modal-checker-input">Batal</button>
-        <button class="btn btn-primary" id="btn-save-checker-input">Simpan Hasil Hitung</button>
+      <div class="sb-modal-footer">
+        <button class="sb-btn sb-btn-secondary" data-close="modal-checker-input">Batal</button>
+        <button class="sb-btn sb-btn-primary" id="btn-save-checker-input">Simpan Hasil Hitung</button>
       </div>
     </div>
   </div>
 
-  <!-- ================= MODAL: USER & ROLE SWITCHER ================= -->
-  <div class="modal-overlay" id="modal-user-switcher" style="display: none;">
-    <div class="modal-content" style="max-width: 440px;">
-      <div class="modal-header">
-        <h3 class="modal-title">Pilih Profil Akun</h3>
-        <button class="btn-close-modal" data-close="modal-user-switcher">&times;</button>
+  <!-- ================= 6. USER MODAL ================= -->
+  <div class="sb-modal-overlay" id="modal-user-switcher" style="display: none;">
+    <div class="sb-modal-content" style="max-width: 440px;">
+      <div class="sb-modal-header">
+        <h3 style="font-size: 1rem; font-weight: 800; color: #fff;">Pilih Profil Akun</h3>
+        <button class="sb-btn sb-btn-secondary sb-btn-sm" data-close="modal-user-switcher">&times;</button>
       </div>
-      <div class="modal-body" id="users-list-container">
+      <div class="sb-modal-body" id="users-list-container">
         <!-- Rendered by JS -->
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-close="modal-user-switcher">Tutup</button>
+      <div class="sb-modal-footer">
+        <button class="sb-btn sb-btn-secondary" data-close="modal-user-switcher">Tutup</button>
       </div>
     </div>
   </div>
 
-  <!-- ================= MODAL: SUPABASE CONFIG ================= -->
-  <div class="modal-overlay" id="modal-supabase-config" style="display: none;">
-    <div class="modal-content" style="max-width: 460px;">
-      <div class="modal-header">
-        <h3 class="modal-title">⚡ Koneksi Supabase Cloud</h3>
-        <button class="btn-close-modal" data-close="modal-supabase-config">&times;</button>
+  <!-- ================= 7. SUPABASE CONFIG MODAL ================= -->
+  <div class="sb-modal-overlay" id="modal-supabase-config" style="display: none;">
+    <div class="sb-modal-content" style="max-width: 480px;">
+      <div class="sb-modal-header">
+        <h3 style="font-size: 1rem; font-weight: 800; color: #fff;">⚡ Koneksi Supabase Database</h3>
+        <button class="sb-btn sb-btn-secondary sb-btn-sm" data-close="modal-supabase-config">&times;</button>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="cfg-supabase-url">Supabase Project URL:</label>
-          <input type="url" id="cfg-supabase-url" class="form-input" placeholder="https://xxxxxxxx.supabase.co" style="font-family: var(--font-mono);">
-          <span style="font-size: 0.68rem; color: var(--text-muted);">Dari: Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project URL</span>
+      <div class="sb-modal-body">
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Supabase Project URL:</label>
+          <input type="url" id="cfg-supabase-url" class="sb-input font-mono" placeholder="https://xxxxxxxx.supabase.co">
+          <span style="font-size: 0.7rem; color: var(--sb-text-low); margin-top: 0.25rem; display: block;">Dapatkan dari: Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project URL</span>
         </div>
-        <div class="form-group">
-          <label class="form-label">Publishable Key:</label>
-          <input type="text" class="form-input" readonly value="sb_publishable_fmfAwbFQbEsVaW_wGI73uQ_pbpbiQGN" style="font-family: var(--font-mono); font-size: 0.72rem; background: #f8fafc;">
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">Publishable Key:</label>
+          <input type="text" class="sb-input font-mono" readonly value="sb_publishable_fmfAwbFQbEsVaW_wGI73uQ_pbpbiQGN" style="background: var(--sb-surface-2); font-size: 0.75rem;">
+        </div>
+        <div style="background-color: var(--sb-canvas); border: 1px solid var(--sb-border); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--sb-text-med);">
+          <strong style="color: var(--sb-brand);">Data Safety Guarantee:</strong>
+          <p style="margin-top: 0.25rem;">File <code style="color: #fff;">supabase/schema.sql</code> telah dikonfigurasi aman (tidak menghapus atau menimpa data hitung aktif di database live).</p>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-close="modal-supabase-config">Tutup</button>
-        <button class="btn btn-primary" id="btn-save-supabase-config">Hubungkan</button>
+      <div class="sb-modal-footer">
+        <button class="sb-btn sb-btn-secondary" data-close="modal-supabase-config">Tutup</button>
+        <button class="sb-btn sb-btn-primary" id="btn-save-supabase-config">Hubungkan</button>
       </div>
     </div>
   </div>

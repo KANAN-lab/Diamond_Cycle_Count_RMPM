@@ -117,21 +117,27 @@ class CycleCountApp {
 
   // ================= Event Listeners =================
   bindEvents() {
-    // Mobile Bottom Navigation
-    document.querySelectorAll('.bnav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const targetView = btn.getAttribute('data-target');
-        this.switchView(targetView);
-      });
-    });
-
-    // Desktop Navigation Tabs
-    document.querySelectorAll('.nav-tab').forEach(tab => {
+    // Navigation Tabs (Supabase Studio Desktop Subnav & Mobile Bottom Bar)
+    document.querySelectorAll('.sb-tab, .sb-bnav-item').forEach(tab => {
       tab.addEventListener('click', () => {
         const targetView = tab.getAttribute('data-target');
         this.switchView(targetView);
       });
     });
+
+    // Dashboard Search & Filter Inputs
+    const dashSearch = document.getElementById('dash-search-input');
+    if (dashSearch) {
+      dashSearch.addEventListener('input', () => this.renderDashboard());
+    }
+    const dashBin = document.getElementById('dash-filter-bin');
+    if (dashBin) {
+      dashBin.addEventListener('change', () => this.renderDashboard());
+    }
+    const dashStatus = document.getElementById('dash-filter-status');
+    if (dashStatus) {
+      dashStatus.addEventListener('change', () => this.renderDashboard());
+    }
 
     // BIN Steppers (◀ / ▶)
     document.getElementById('btn-prev-bin').addEventListener('click', () => {
@@ -377,21 +383,14 @@ class CycleCountApp {
       s.classList.toggle('active', s.id === viewId);
     });
 
-    // Mobile Bottom Nav buttons
-    document.querySelectorAll('.bnav-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-target') === viewId);
-    });
-
-    // Desktop Nav tabs
-    document.querySelectorAll('.nav-tab').forEach(tab => {
+    // Supabase Subnav tabs (Desktop) & Mobile Bottom Nav items
+    document.querySelectorAll('.sb-tab').forEach(tab => {
       tab.classList.toggle('active', tab.getAttribute('data-target') === viewId);
     });
 
-    // Show/hide Location strip (only in Checker view on mobile)
-    const locStrip = document.getElementById('global-location-strip');
-    if (locStrip) {
-      locStrip.style.display = viewId === 'view-checker' ? 'block' : 'none';
-    }
+    document.querySelectorAll('.sb-bnav-item').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-target') === viewId);
+    });
 
     if (viewId === 'view-checker') {
       this.renderActiveBinView();
@@ -778,49 +777,98 @@ class CycleCountApp {
     const iraRate = total > 0 ? ((matched / total) * 100).toFixed(1) : '0.0';
 
     document.getElementById('dash-ira-rate').textContent = `${iraRate}%`;
-    document.getElementById('dash-ira-summary').textContent = `${matched} Cocok dari ${total} Item (Target &ge; 98%)`;
+    document.getElementById('dash-ira-count').textContent = `(${matched} Cocok)`;
     document.getElementById('dash-diff-items').textContent = `${diffCount} Item`;
-    document.getElementById('dash-net-variance').textContent = `Net Selisih: ${(netVariance >= 0 ? '+' : '') + netVariance.toFixed(1)} KG`;
+    document.getElementById('dash-net-variance').textContent = `Net Selisih: ${(netVariance >= 0 ? '+' : '') + netVariance.toFixed(2)} KG`;
     document.getElementById('dash-misplaced-items').textContent = `${misplacedCount} Item`;
+    document.getElementById('dash-total-items').textContent = total;
+    
+    let totalSapKg = 0;
+    this.items.forEach(i => totalSapKg += i.qtySap);
+    document.getElementById('dash-total-sap').textContent = `Total SAP: ${totalSapKg.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
+
+    // Filter Items for Table Editor
+    const filterBin = document.getElementById('dash-filter-bin') ? document.getElementById('dash-filter-bin').value : 'ALL';
+    const filterStatus = document.getElementById('dash-filter-status') ? document.getElementById('dash-filter-status').value : 'ALL';
+    const searchVal = document.getElementById('dash-search-input') ? document.getElementById('dash-search-input').value.toLowerCase().trim() : '';
+
+    const filteredItems = this.items.filter(item => {
+      if (filterBin !== 'ALL' && !item.bin.startsWith(filterBin)) return false;
+      
+      const targetNet = item.qtySap - (item.pickingQty || 0);
+      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
+      const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
+
+      if (filterStatus === 'DISCREPANCY' && !isDiff) return false;
+      if (filterStatus === 'MATCHED' && (!isCounted || isDiff)) return false;
+      if (filterStatus === 'PENDING' && isCounted) return false;
+      if (filterStatus === 'MISPLACED' && !item.isMisplaced) return false;
+
+      if (searchVal) {
+        const text = `${item.bin} ${item.materialNumber} ${item.materialDesc} ${item.batchFisik} ${item.batchSap}`.toLowerCase();
+        if (!text.includes(searchVal)) return false;
+      }
+
+      return true;
+    });
 
     // Render Master Table
     const tbody = document.getElementById('dash-master-tbody');
     tbody.innerHTML = '';
 
-    this.items.forEach((item, idx) => {
+    if (filteredItems.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="14" style="text-align: center; padding: 3rem; color: var(--sb-text-med);">
+            Tidak ada item yang sesuai dengan filter pencarian.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    filteredItems.forEach((item, idx) => {
       const targetNet = item.qtySap - (item.pickingQty || 0);
       const isCounted = item.actualQty !== null && item.actualQty !== undefined;
       const diff = isCounted ? (item.actualQty - targetNet) : 0;
       const isDiff = isCounted && Math.abs(diff) >= 0.001;
 
       const tr = document.createElement('tr');
-      if (isDiff) tr.className = 'row-discrepancy';
-      if (item.isMisplaced) tr.className = 'row-misplaced';
+      if (isDiff) tr.className = 'row-diff';
+      if (item.isMisplaced) tr.className = 'row-reloc';
 
-      let statusBadge = '<span class="badge badge-pending">PENDING</span>';
+      let statusBadge = '<span class="sb-badge sb-badge-pending">PENDING</span>';
       if (isCounted) {
-        statusBadge = isDiff ? '<span class="badge badge-discrepancy">SELISIH</span>' : '<span class="badge badge-matched">COCOK</span>';
+        statusBadge = isDiff ? '<span class="sb-badge sb-badge-diff">SELISIH</span>' : '<span class="sb-badge sb-badge-match">COCOK</span>';
       }
-      if (item.isMisplaced) statusBadge += ` <span class="badge badge-misplaced">PINDAH</span>`;
+      if (item.isMisplaced) statusBadge += ` <span class="sb-badge sb-badge-reloc">PINDAH</span>`;
 
       tr.innerHTML = `
-        <td style="text-align: center;">${item.no || idx + 1}</td>
-        <td><span class="badge-bin">${item.bin}</span></td>
-        <td style="font-family: var(--font-mono);">${item.materialNumber}</td>
-        <td><strong>${item.materialDesc}</strong></td>
-        <td style="color:var(--brand-blue); font-weight:700; font-family:var(--font-mono);">${item.batchFisik}</td>
-        <td style="font-family: var(--font-mono);">${item.batchSap}</td>
-        <td style="text-align: right; font-family: var(--font-mono);">${item.qtySap.toFixed(2)}</td>
-        <td style="text-align: right; font-family: var(--font-mono);">${item.pickingQty.toFixed(2)}</td>
-        <td style="text-align: right; font-weight:700; font-family: var(--font-mono);">${targetNet.toFixed(2)}</td>
-        <td style="text-align: right; font-weight:800; font-family: var(--font-mono);">${isCounted ? item.actualQty.toFixed(2) : '-'}</td>
-        <td style="text-align: right; font-weight:800; color:${isDiff ? 'var(--status-diff)' : 'var(--status-match)'}; font-family: var(--font-mono);">
+        <td style="text-align: center; color: var(--sb-text-med); font-family: var(--font-mono);">${item.no || idx + 1}</td>
+        <td><span class="sb-badge-bin">${item.bin}</span></td>
+        <td class="font-mono">${item.materialNumber}</td>
+        <td>
+          <div style="font-weight: 700; color: #fff;">${item.materialDesc}</div>
+          ${item.unitConversion ? `<div style="font-size: 0.72rem; color: var(--sb-text-med); margin-top: 0.15rem;">${item.unitConversion}</div>` : ''}
+        </td>
+        <td class="font-mono" style="color: var(--sb-info); font-weight: 700; white-space: nowrap;">${item.batchFisik}</td>
+        <td class="font-mono" style="color: var(--sb-text-med); white-space: nowrap;">${item.batchSap}</td>
+        <td class="num-cell">${item.qtySap.toFixed(2)}</td>
+        <td class="num-cell" style="color: ${item.pickingQty > 0 ? 'var(--sb-warning)' : 'inherit'};">${item.pickingQty.toFixed(2)}</td>
+        <td class="num-cell" style="font-weight: 800; color: #fff;">${targetNet.toFixed(2)}</td>
+        <td class="num-cell" style="font-weight: 800; color: ${isCounted ? (isDiff ? 'var(--sb-danger)' : 'var(--sb-brand)') : 'var(--sb-text-low)'};">
+          ${isCounted ? item.actualQty.toFixed(2) : '-'}
+        </td>
+        <td class="num-cell" style="font-weight: 800; color: ${isDiff ? 'var(--sb-danger)' : (isCounted ? 'var(--sb-brand)' : 'var(--sb-text-low)')};">
           ${isCounted ? (diff >= 0 ? '+' : '') + diff.toFixed(2) : '-'}
         </td>
         <td style="text-align: center;">${statusBadge}</td>
-        <td style="font-size: 0.72rem;">${item.note || '-'}</td>
+        <td style="font-size: 0.75rem; color: var(--sb-text-med);">
+          ${item.note || '-'}
+          ${item.isMisplaced && item.newBin ? `<div style="color: var(--sb-info); font-weight: 600; margin-top: 0.2rem;">↳ Pindah ke: ${item.newBin}</div>` : ''}
+        </td>
         <td style="text-align: center;">
-          <button class="btn btn-secondary btn-sm" data-action="tbl-edit">Edit</button>
+          <button class="sb-btn sb-btn-secondary sb-btn-sm" data-action="tbl-edit">Edit</button>
         </td>
       `;
 

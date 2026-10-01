@@ -1,9 +1,9 @@
 -- ==============================================================================
--- RMPM Cycle Count Database Schema for Supabase
--- Tables: cc_schedules, cc_items, cc_users
+-- RMPM Cycle Count Database Schema for Supabase (Safe & Idempotent Migration)
+-- GUARANTEE: Does NOT drop, truncate, or overwrite live user count data!
 -- ==============================================================================
 
--- 1. Schedules Table
+-- 1. Schedules Table (Safe Creation)
 CREATE TABLE IF NOT EXISTS public.cc_schedules (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   doc_no TEXT NOT NULL,
@@ -11,15 +11,15 @@ CREATE TABLE IF NOT EXISTS public.cc_schedules (
   spv_name TEXT NOT NULL,
   area_name TEXT NOT NULL,
   target_category TEXT DEFAULT 'Raw Material & Packaging Material',
-  status TEXT DEFAULT 'IN_PROGRESS', -- IN_PROGRESS, COMPLETED, AUDITED
+  status TEXT DEFAULT 'IN_PROGRESS',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Items Table
+-- 2. Items Table (Safe Creation)
 CREATE TABLE IF NOT EXISTS public.cc_items (
   id TEXT PRIMARY KEY,
-  schedule_id TEXT REFERENCES public.cc_schedules(id) ON DELETE CASCADE,
+  schedule_id TEXT,
   no INTEGER,
   bin TEXT NOT NULL,
   material_number TEXT NOT NULL,
@@ -35,37 +35,80 @@ CREATE TABLE IF NOT EXISTS public.cc_items (
   note TEXT,
   is_misplaced BOOLEAN DEFAULT FALSE,
   new_bin TEXT,
-  status TEXT DEFAULT 'PENDING', -- PENDING, MATCHED, DISCREPANCY, COUNTED
+  status TEXT DEFAULT 'PENDING',
   counted_by TEXT,
   counted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Users Table
+-- 3. Users Table (Safe Creation)
 CREATE TABLE IF NOT EXISTS public.cc_users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL, -- ADMIN, CHECKER, AUDITOR
+  role TEXT NOT NULL,
   name TEXT NOT NULL,
   title TEXT,
   badge TEXT
 );
 
--- 4. Enable Row Level Security (RLS) & Public Policies for Anon Client
+-- 4. Safe Foreign Key & Column Additions (Won't fail if already exist)
+DO $$
+BEGIN
+  -- Add foreign key if not exists
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_cc_items_schedule'
+  ) THEN
+    ALTER TABLE public.cc_items
+    ADD CONSTRAINT fk_cc_items_schedule
+    FOREIGN KEY (schedule_id) REFERENCES public.cc_schedules(id) ON DELETE CASCADE;
+  END IF;
+
+  -- Ensure columns exist without disrupting existing data
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_items' AND column_name = 'unit_conversion') THEN
+    ALTER TABLE public.cc_items ADD COLUMN unit_conversion TEXT;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_items' AND column_name = 'is_misplaced') THEN
+    ALTER TABLE public.cc_items ADD COLUMN is_misplaced BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_items' AND column_name = 'new_bin') THEN
+    ALTER TABLE public.cc_items ADD COLUMN new_bin TEXT;
+  END IF;
+END $$;
+
+-- 5. Row Level Security (RLS) - Safe Policy Recreation
 ALTER TABLE public.cc_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cc_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cc_users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public read/write on cc_schedules" ON public.cc_schedules;
 CREATE POLICY "Allow public read/write on cc_schedules" ON public.cc_schedules FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public read/write on cc_items" ON public.cc_items;
 CREATE POLICY "Allow public read/write on cc_items" ON public.cc_items FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public read/write on cc_users" ON public.cc_users;
 CREATE POLICY "Allow public read/write on cc_users" ON public.cc_users FOR ALL USING (true) WITH CHECK (true);
 
--- 5. Enable Supabase Realtime for instant sync between Checker & Admin
-ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_items;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_schedules;
+-- 6. Enable Realtime Safely (Checks publication first)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'cc_items'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_items;
+  END IF;
 
--- 6. Seed Initial Users
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'cc_schedules'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_schedules;
+  END IF;
+END $$;
+
+-- 7. Seed Initial Users (DO NOTHING on conflict -> Never overwrites active users)
 INSERT INTO public.cc_users (id, username, role, name, title, badge) VALUES
   ('admin_asep', 'spv_asep', 'ADMIN', 'Asep Saepullah', 'SPV Warehouse RMPM', 'Administrator / SPV'),
   ('checker_budi', 'checker_budi', 'CHECKER', 'Budi Santoso', 'Field Checker RMPM', 'Cycle Count Team A'),
@@ -73,12 +116,12 @@ INSERT INTO public.cc_users (id, username, role, name, title, badge) VALUES
   ('acc_siti', 'acc_siti', 'AUDITOR', 'Siti Rahayu, SE.', 'Cost & Inventory Accounting', 'Accounting & Audit')
 ON CONFLICT (id) DO NOTHING;
 
--- 7. Seed Initial Active Schedule
+-- 8. Seed Initial Active Schedule (DO NOTHING on conflict -> Never overwrites active schedule)
 INSERT INTO public.cc_schedules (id, doc_no, schedule_date, spv_name, area_name, target_category) VALUES
   ('sched-2026-09-21-01', 'BA-CC-RMPM/2026/09/21-01', '2026-09-21', 'SPV ASEP', 'RMPM Warehouse - Zone B (B.01 & B.02)', 'Raw Material & Packaging Material')
 ON CONFLICT (id) DO NOTHING;
 
--- 8. Seed 20 Initial Items from Physical Form
+-- 9. Seed 20 Initial Items (DO NOTHING on conflict -> Never overwrites live counted records!)
 INSERT INTO public.cc_items (id, schedule_id, no, bin, material_number, batch_sap, batch_fisik, exp_date, material_desc, uom, qty_sap, picking_qty, actual_qty, unit_conversion, note, is_misplaced, new_bin, status, counted_by) VALUES
   ('item-1', 'sched-2026-09-21-01', 1, 'B.01B.2.01', '40000210', '4000079065', '25391003-PALSGA', '22-Sep-27', 'MONO & DI GLYCERIDE (DMG 0097)', 'KG', 500.0, 0.0, 380.0, '10 Sak KG', 'Fisik 380 KG (10 Sak KG)', false, '', 'COUNTED', 'Budi Santoso'),
   ('item-2', 'sched-2026-09-21-01', 2, 'B.01A.5.01', '40000210', '4000079065', '25391003-PALSGA', '22-Sep-27', 'MONO & DI GLYCERIDE (DMG 0097)', 'KG', 200.0, 60.0, 180.0, 'FL-2', 'Ada proses picking FL-2', false, '', 'COUNTED', 'Budi Santoso'),
@@ -100,9 +143,4 @@ INSERT INTO public.cc_items (id, schedule_id, no, bin, material_number, batch_sa
   ('item-18', 'sched-2026-09-21-01', 18, 'B.02A.4.03', '40000305', '4000078324', '6C2819K-CPKELCO', '23-Mar-28', 'GELLAN GUM', 'KG', 175.0, 25.0, 600.0, '+450 KG', 'Kelebihan fisik +450 KG, cek transfer belum posting', false, '', 'DISCREPANCY', 'Budi Santoso'),
   ('item-19', 'sched-2026-09-21-01', 19, 'B.02A.5.03', '40000228', '4000077598', 'FS19754FG-CHANG', '01-Jun-28', 'MALIC ACID', 'KG', 400.0, 0.0, 400.0, '16 Sak @25kg', 'Sesuai', false, '', 'MATCHED', 'Budi Santoso'),
   ('item-20', 'sched-2026-09-21-01', 20, 'B.02A.2.14', '40000228', '4000077598', 'FS19754FG-CHANG', '01-Jun-28', 'MALIC ACID', 'KG', 600.0, 0.0, 150.0, '6 Sak @25kg', 'Fisik hanya 150 KG (selisih -450 KG)', false, '', 'DISCREPANCY', 'Budi Santoso')
-ON CONFLICT (id) DO UPDATE SET
-  actual_qty = EXCLUDED.actual_qty,
-  note = EXCLUDED.note,
-  is_misplaced = EXCLUDED.is_misplaced,
-  new_bin = EXCLUDED.new_bin,
-  status = EXCLUDED.status;
+ON CONFLICT (id) DO NOTHING;
