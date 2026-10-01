@@ -922,6 +922,167 @@ body {
   font-weight: 600;
 }
 
+/* ==========================================================================
+   10. DATATABLES & MODERN UI ENHANCEMENTS
+   ========================================================================== */
+.dataTables_wrapper {
+  padding: 0.85rem 1rem;
+  color: var(--text-main);
+  font-size: 0.85rem;
+}
+
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter,
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_processing,
+.dataTables_wrapper .dataTables_paginate {
+  color: var(--text-secondary) !important;
+  margin-bottom: 0.75rem;
+}
+
+.dataTables_wrapper .dataTables_length select {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 0.3rem 0.6rem;
+  outline: none;
+  font-size: 0.8rem;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 0.4rem 0.8rem;
+  margin-left: 0.5rem;
+  outline: none;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+
+.dataTables_wrapper .dataTables_filter input:focus {
+  border-color: var(--brand-primary);
+  background-color: var(--surface-main);
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid transparent !important;
+  color: var(--text-main) !important;
+  padding: 0.35rem 0.75rem !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  margin: 0 2px !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+  background: var(--surface-subtle) !important;
+  border-color: var(--border-main) !important;
+  color: var(--text-main) !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+  background: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+  color: #121212 !important;
+  font-weight: 800 !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover {
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  opacity: 0.45;
+}
+
+table.dataTable {
+  border-collapse: collapse !important;
+}
+
+table.dataTable thead th,
+table.dataTable thead td {
+  border-bottom: 1px solid var(--border-main) !important;
+}
+
+table.dataTable.no-footer {
+  border-bottom: 1px solid var(--border-main) !important;
+}
+
+/* SweetAlert2 Theme Integration */
+.swal2-popup.swal-custom-popup {
+  background-color: var(--surface-main) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-main) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.swal2-popup.swal-custom-popup .swal2-title {
+  color: var(--text-main) !important;
+}
+
+.swal2-popup.swal-custom-popup .swal2-html-container {
+  color: var(--text-secondary) !important;
+}
+
+.swal2-confirm.swal2-styled {
+  background-color: var(--brand-primary) !important;
+  color: #121212 !important;
+  font-weight: 700 !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.swal2-cancel.swal2-styled {
+  background-color: var(--surface-subtle) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-main) !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* ApexCharts Modern Container */
+.chart-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.chart-card {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.chart-card-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-card-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 @media print {
   body {
     background: #ffffff !important;
@@ -934,6 +1095,7 @@ body {
   .modal-overlay,
   .btn-core,
   .kpi-deck,
+  .chart-deck,
   .location-stepper-box {
     display: none !important;
   }

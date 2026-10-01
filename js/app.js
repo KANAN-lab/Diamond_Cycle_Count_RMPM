@@ -1,6 +1,6 @@
 // ==========================================================================
-// RMPM Cycle Count System - Unified Navbar & Dual Theme Controller
-// Built for Warehouse Floor Scanners & Desktop Reconciliation Dashboard
+// RMPM Cycle Count System - Enterprise Industrial WMS Controller
+// Powered by: Font Awesome 6, SweetAlert2, DataTables, ApexCharts & Supabase
 // Default Theme: LIGHT THEME (Crisp, High-Contrast, Legible in Dark & Light)
 // ==========================================================================
 
@@ -25,6 +25,11 @@ class CycleCountApp {
     this.currentItemIndexInBin = 0;
     this.isFocusMode = true; // Guided single-item Zebra style
     this.activePackWeight = 25; // default 25 KG per Sak
+
+    // DataTables & Charts references
+    this.dataTable = null;
+    this.iraDonutChart = null;
+    this.varianceBarChart = null;
 
     // Filters & Search
     this.searchQuery = '';
@@ -73,8 +78,13 @@ class CycleCountApp {
 
     const icon = document.getElementById('theme-toggle-icon');
     if (icon) {
-      // If current is dark, show sun (to switch to light); if light, show moon
-      icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+      // If dark theme, show sun; if light, show moon
+      icon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    }
+
+    // Refresh charts theme if initialized
+    if (this.iraDonutChart || this.varianceBarChart) {
+      this.renderAnalyticsCharts();
     }
   }
 
@@ -167,11 +177,7 @@ class CycleCountApp {
       themeBtn.addEventListener('click', () => this.toggleTheme());
     }
 
-    // 3. Dashboard Search & Filters
-    const dashSearch = document.getElementById('dash-search-input');
-    if (dashSearch) {
-      dashSearch.addEventListener('input', () => this.renderDashboard());
-    }
+    // 3. Dashboard Filters
     const dashBin = document.getElementById('dash-filter-bin');
     if (dashBin) {
       dashBin.addEventListener('change', () => this.renderDashboard());
@@ -180,8 +186,12 @@ class CycleCountApp {
     if (dashStatus) {
       dashStatus.addEventListener('change', () => this.renderDashboard());
     }
+    const dashSearch = document.getElementById('dash-search-input');
+    if (dashSearch) {
+      dashSearch.addEventListener('input', () => this.renderDashboard());
+    }
 
-    // 4. BIN Steppers (◀ / ▶)
+    // 4. BIN Steppers (Prev / Next)
     document.getElementById('btn-prev-bin').addEventListener('click', () => {
       if (this.currentBinIndex > 0) {
         this.currentBinIndex--;
@@ -198,14 +208,12 @@ class CycleCountApp {
       }
     });
 
-    // 5. Mode Toggle (🎯 Focus vs 📋 List)
+    // 5. Mode Toggle (Focus vs List)
     document.getElementById('btn-toggle-focus-mode').addEventListener('click', () => {
       this.isFocusMode = !this.isFocusMode;
-      const btn = document.getElementById('btn-toggle-focus-mode');
-      if (this.isFocusMode) {
-        btn.textContent = '🎯 Mode Fokus';
-      } else {
-        btn.textContent = '📋 Mode List';
+      const textSpan = document.getElementById('btn-toggle-focus-text');
+      if (textSpan) {
+        textSpan.textContent = this.isFocusMode ? 'Mode Fokus' : 'Mode List';
       }
       this.renderActiveBinView();
     });
@@ -283,7 +291,12 @@ class CycleCountApp {
     document.getElementById('btn-save-supabase-config').addEventListener('click', async () => {
       const urlInput = document.getElementById('cfg-supabase-url').value.trim();
       if (!urlInput) {
-        alert('Masukkan URL Supabase yang valid (contoh: https://xxxxxxxx.supabase.co)');
+        Swal.fire({
+          icon: 'warning',
+          title: 'URL Belum Diisi',
+          text: 'Masukkan URL Supabase Project yang valid (contoh: https://xxxxxxxx.supabase.co)',
+          customClass: { popup: 'swal-custom-popup' }
+        });
         return;
       }
       if (window.supabaseService) {
@@ -292,7 +305,12 @@ class CycleCountApp {
         await this.initSupabaseSync();
       }
       document.getElementById('modal-supabase-config').style.display = 'none';
-      alert('Koneksi Supabase berhasil disimpan! Realtime sync aktif.');
+      Swal.fire({
+        icon: 'success',
+        title: 'Koneksi Supabase Disimpan',
+        text: 'Sinkronisasi Realtime Database sekarang aktif secara otomatis.',
+        customClass: { popup: 'swal-custom-popup' }
+      });
     });
 
     // 14. Packaging Converter Steppers in Modal
@@ -316,12 +334,25 @@ class CycleCountApp {
 
         const weightAttr = btn.getAttribute('data-weight');
         if (weightAttr === 'custom') {
-          const userVal = prompt('Masukkan berat standar per kemasan (KG):', '25');
-          this.activePackWeight = parseFloat(userVal) || 25;
+          Swal.fire({
+            title: 'Berat Kemasan Khusus',
+            input: 'number',
+            inputLabel: 'Masukkan berat standar per kemasan (KG):',
+            inputValue: 25,
+            showCancelButton: true,
+            confirmButtonText: 'Terapkan',
+            cancelButtonText: 'Batal',
+            customClass: { popup: 'swal-custom-popup' }
+          }).then(result => {
+            if (result.isConfirmed && result.value) {
+              this.activePackWeight = parseFloat(result.value) || 25;
+              this.recalcPackagingModalTotal();
+            }
+          });
         } else {
           this.activePackWeight = parseFloat(weightAttr) || 25;
+          this.recalcPackagingModalTotal();
         }
-        this.recalcPackagingModalTotal();
       });
     });
 
@@ -458,12 +489,12 @@ class CycleCountApp {
     if (!dot || !text || !btn) return;
 
     if (window.supabaseService && window.supabaseService.isConnected) {
-      dot.textContent = '🟢';
+      dot.style.color = 'var(--brand-primary)';
       text.textContent = 'Cloud Sync';
       btn.style.borderColor = 'var(--brand-primary)';
       btn.style.color = 'var(--text-main)';
     } else {
-      dot.textContent = '⚡';
+      dot.style.color = 'var(--status-pending)';
       text.textContent = 'Hubungkan DB';
       btn.style.borderColor = 'var(--border-strong)';
       btn.style.color = 'var(--text-muted)';
@@ -531,7 +562,7 @@ class CycleCountApp {
           <div style="font-size: 0.75rem; color: var(--text-muted);">${u.title} &bull; <strong style="color: var(--brand-primary);">${u.badge}</strong></div>
         </div>
         <div>
-          ${isCurrent ? '<span style="font-size: 0.75rem; color: var(--brand-primary); font-weight: 800;">AKTIF</span>' : '<button class="btn-core btn-secondary btn-sm">Pilih</button>'}
+          ${isCurrent ? '<span style="font-size: 0.75rem; color: var(--brand-primary); font-weight: 800;"><i class="fa-solid fa-check"></i> AKTIF</span>' : '<button class="btn-core btn-secondary btn-sm">Pilih</button>'}
         </div>
       `;
 
@@ -546,6 +577,15 @@ class CycleCountApp {
         } else {
           this.switchView('view-dashboard');
         }
+
+        Swal.fire({
+          icon: 'info',
+          title: 'Akun Aktif',
+          text: `Beralih ke profil ${u.name} (${u.role})`,
+          timer: 1200,
+          showConfirmButton: false,
+          customClass: { popup: 'swal-custom-popup' }
+        });
       });
 
       container.appendChild(card);
@@ -604,17 +644,17 @@ class CycleCountApp {
     document.getElementById('fc-picking').textContent = `${item.pickingQty.toFixed(1)} ${item.uom}`;
     document.getElementById('fc-target-net').textContent = `${targetNet.toFixed(3)} ${item.uom}`;
 
-    // Status Badge
-    let badgeHtml = '<span class="app-badge badge-pending">BELUM HITUNG</span>';
+    // Status Badge with Font Awesome
+    let badgeHtml = '<span class="app-badge badge-pending"><i class="fa-regular fa-clock"></i> BELUM HITUNG</span>';
     if (isCounted) {
       if (isDiff) {
-        badgeHtml = '<span class="app-badge badge-diff">⚠️ SELISIH</span>';
+        badgeHtml = '<span class="app-badge badge-diff"><i class="fa-solid fa-triangle-exclamation"></i> SELISIH</span>';
       } else {
-        badgeHtml = '<span class="app-badge badge-match">✅ COCOK</span>';
+        badgeHtml = '<span class="app-badge badge-match"><i class="fa-solid fa-circle-check"></i> COCOK</span>';
       }
     }
     if (item.isMisplaced) {
-      badgeHtml += ` <span class="app-badge badge-reloc">PINDAH: ${item.newBin}</span>`;
+      badgeHtml += ` <span class="app-badge badge-reloc"><i class="fa-solid fa-truck-ramp-box"></i> PINDAH: ${item.newBin}</span>`;
     }
     document.getElementById('fc-status-badge').innerHTML = badgeHtml;
 
@@ -671,9 +711,9 @@ class CycleCountApp {
       const isCounted = item.actualQty !== null && item.actualQty !== undefined;
       const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
 
-      let badge = '<span class="app-badge badge-pending">BELUM</span>';
+      let badge = '<span class="app-badge badge-pending"><i class="fa-regular fa-clock"></i> BELUM</span>';
       if (isCounted) {
-        badge = isDiff ? '<span class="app-badge badge-diff">SELISIH</span>' : '<span class="app-badge badge-match">COCOK</span>';
+        badge = isDiff ? '<span class="app-badge badge-diff"><i class="fa-solid fa-triangle-exclamation"></i> SELISIH</span>' : '<span class="app-badge badge-match"><i class="fa-solid fa-circle-check"></i> COCOK</span>';
       }
 
       const card = document.createElement('div');
@@ -696,8 +736,14 @@ class CycleCountApp {
         </div>
 
         <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-          <button class="btn-core btn-primary btn-sm" data-action="list-match">✅ Sesuai</button>
-          <button class="btn-core btn-secondary btn-sm" data-action="list-edit">✏️ Input Fisik</button>
+          <button class="btn-core btn-primary btn-sm" data-action="list-match">
+            <i class="fa-solid fa-check"></i>
+            <span>Sesuai</span>
+          </button>
+          <button class="btn-core btn-secondary btn-sm" data-action="list-edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Input Fisik</span>
+          </button>
         </div>
       `;
 
@@ -730,6 +776,15 @@ class CycleCountApp {
     this.renderActiveBinView();
     this.renderDashboard();
     this.renderPrintout();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Stok Sesuai (100% Cocok)',
+      text: `${item.materialDesc} telah ditandai cocok dengan SAP (${targetNet.toFixed(2)} ${item.uom}).`,
+      timer: 1200,
+      showConfirmButton: false,
+      customClass: { popup: 'swal-custom-popup' }
+    });
   }
 
   openCheckerInputModal(item, forceMisplaced = false) {
@@ -760,7 +815,12 @@ class CycleCountApp {
 
     const actualStr = document.getElementById('input-actual-qty').value.trim();
     if (actualStr === '') {
-      alert('Total kuantitas fisik harus diisi!');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Input Kuantitas Kosong',
+        text: 'Total kuantitas fisik aktual wajib diisi!',
+        customClass: { popup: 'swal-custom-popup' }
+      });
       return;
     }
 
@@ -777,11 +837,8 @@ class CycleCountApp {
     this.activeEditItem.countedBy = this.currentUser ? this.currentUser.name : 'Petugas';
     this.activeEditItem.countedAt = new Date().toISOString().replace('T', ' ').substring(0, 16);
 
-    if (Math.abs(actualQty - targetNet) < 0.001) {
-      this.activeEditItem.status = 'MATCHED';
-    } else {
-      this.activeEditItem.status = 'DISCREPANCY';
-    }
+    const isMatch = Math.abs(actualQty - targetNet) < 0.001;
+    this.activeEditItem.status = isMatch ? 'MATCHED' : 'DISCREPANCY';
 
     this.saveItems();
     if (window.supabaseService) {
@@ -792,9 +849,170 @@ class CycleCountApp {
     this.renderActiveBinView();
     this.renderDashboard();
     this.renderPrintout();
+
+    Swal.fire({
+      icon: isMatch ? 'success' : 'warning',
+      title: isMatch ? 'Hasil Hitung Cocok' : 'Tercatat Selisih',
+      text: `${this.activeEditItem.materialDesc}: ${actualQty.toFixed(2)} ${this.activeEditItem.uom}`,
+      timer: 1300,
+      showConfirmButton: false,
+      customClass: { popup: 'swal-custom-popup' }
+    });
   }
 
-  // ================= 10. DASHBOARD RENDERING (TABLE EDITOR) =================
+  // ================= 10. MODERN APEXCHARTS ANALYTICS =================
+  renderAnalyticsCharts() {
+    if (typeof ApexCharts === 'undefined') return;
+
+    let matched = 0;
+    let discrepancy = 0;
+    let pending = 0;
+
+    const binVarianceMap = {};
+
+    this.items.forEach(item => {
+      const targetNet = item.qtySap - (item.pickingQty || 0);
+      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
+
+      const binPrefix = item.bin ? item.bin.substring(0, 5) : 'OTHER';
+      if (!binVarianceMap[binPrefix]) binVarianceMap[binPrefix] = 0;
+
+      if (!isCounted) {
+        pending++;
+      } else {
+        const diff = item.actualQty - targetNet;
+        binVarianceMap[binPrefix] += diff;
+        if (Math.abs(diff) < 0.001) {
+          matched++;
+        } else {
+          discrepancy++;
+        }
+      }
+    });
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#f8fafc' : '#0f172a';
+    const subtextColor = isDark ? '#94a3b8' : '#64748b';
+
+    // 1. Donut Chart (IRA Stock Accuracy)
+    const donutOptions = {
+      series: [matched, discrepancy, pending],
+      labels: ['Cocok (Matched)', 'Selisih (Discrepancy)', 'Belum Hitung'],
+      colors: ['#10b981', '#f87171', '#fbbf24'],
+      chart: {
+        type: 'donut',
+        height: 240,
+        background: 'transparent',
+        toolbar: { show: false }
+      },
+      dataLabels: { enabled: false },
+      legend: {
+        position: 'bottom',
+        labels: { colors: textColor },
+        fontSize: '12px'
+      },
+      stroke: {
+        show: true,
+        colors: [isDark ? '#181818' : '#ffffff'],
+        width: 2
+      },
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '72%',
+            labels: {
+              show: true,
+              name: { color: subtextColor, fontSize: '12px' },
+              value: { color: textColor, fontSize: '18px', fontWeight: 800 },
+              total: {
+                show: true,
+                label: 'Total Item',
+                color: subtextColor,
+                formatter: () => `${this.items.length} SKU`
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const donutEl = document.getElementById('chart-ira-donut');
+    if (donutEl) {
+      if (this.iraDonutChart) {
+        this.iraDonutChart.destroy();
+      }
+      this.iraDonutChart = new ApexCharts(donutEl, donutOptions);
+      this.iraDonutChart.render();
+    }
+
+    // 2. Bar Chart (Discrepancy Variance per BIN)
+    const binCategories = Object.keys(binVarianceMap);
+    const binValues = binCategories.map(k => parseFloat(binVarianceMap[k].toFixed(2)));
+
+    const barOptions = {
+      series: [{
+        name: 'Net Variance (KG)',
+        data: binValues
+      }],
+      chart: {
+        type: 'bar',
+        height: 240,
+        background: 'transparent',
+        toolbar: { show: false }
+      },
+      colors: [function({ value }) {
+        return value < 0 ? '#f87171' : (value > 0 ? '#60a5fa' : '#10b981');
+      }],
+      plotOptions: {
+        bar: {
+          borderRadius: 4,
+          columnWidth: '45%',
+          colors: {
+            ranges: [
+              { from: -99999, to: -0.01, color: '#f87171' },
+              { from: 0.01, to: 99999, color: '#60a5fa' }
+            ]
+          }
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: (val) => `${val > 0 ? '+' : ''}${val} kg`,
+        style: { fontSize: '11px', colors: [textColor] }
+      },
+      xaxis: {
+        categories: binCategories,
+        labels: { style: { colors: subtextColor, fontSize: '12px', fontWeight: 700 } },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      },
+      yaxis: {
+        labels: {
+          style: { colors: subtextColor, fontSize: '11px' },
+          formatter: (val) => `${val} kg`
+        }
+      },
+      grid: {
+        borderColor: isDark ? '#2e2e2e' : '#e2e8f0',
+        strokeDashArray: 4
+      },
+      tooltip: {
+        theme: isDark ? 'dark' : 'light',
+        y: { formatter: (val) => `${val} KG` }
+      }
+    };
+
+    const barEl = document.getElementById('chart-variance-bar');
+    if (barEl) {
+      if (this.varianceBarChart) {
+        this.varianceBarChart.destroy();
+      }
+      this.varianceBarChart = new ApexCharts(barEl, barOptions);
+      this.varianceBarChart.render();
+    }
+  }
+
+  // ================= 11. DASHBOARD RENDERING & DATATABLES =================
   renderDashboard() {
     let total = this.items.length;
     let matched = 0;
@@ -833,7 +1051,15 @@ class CycleCountApp {
     this.items.forEach(i => totalSapKg += i.qtySap);
     document.getElementById('dash-total-sap').textContent = `Total SAP: ${totalSapKg.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
 
-    // Filter Items for Table Editor
+    // Render ApexCharts Analytics
+    this.renderAnalyticsCharts();
+
+    // Destroy existing DataTable instance before updating DOM rows
+    if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable('#master-table')) {
+      $('#master-table').DataTable().destroy();
+    }
+
+    // Filter Items for Table
     const filterBin = document.getElementById('dash-filter-bin') ? document.getElementById('dash-filter-bin').value : 'ALL';
     const filterStatus = document.getElementById('dash-filter-status') ? document.getElementById('dash-filter-status').value : 'ALL';
     const searchVal = document.getElementById('dash-search-input') ? document.getElementById('dash-search-input').value.toLowerCase().trim() : '';
@@ -858,20 +1084,9 @@ class CycleCountApp {
       return true;
     });
 
-    // Render Master Table
+    // Render Table Rows
     const tbody = document.getElementById('dash-master-tbody');
     tbody.innerHTML = '';
-
-    if (filteredItems.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="14" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-            Tidak ada item yang sesuai dengan filter pencarian.
-          </td>
-        </tr>
-      `;
-      return;
-    }
 
     filteredItems.forEach((item, idx) => {
       const targetNet = item.qtySap - (item.pickingQty || 0);
@@ -883,11 +1098,11 @@ class CycleCountApp {
       if (isDiff) tr.className = 'row-discrepancy';
       if (item.isMisplaced) tr.className = 'row-relocated';
 
-      let statusBadge = '<span class="app-badge badge-pending">PENDING</span>';
+      let statusBadge = '<span class="app-badge badge-pending"><i class="fa-regular fa-clock"></i> PENDING</span>';
       if (isCounted) {
-        statusBadge = isDiff ? '<span class="app-badge badge-diff">SELISIH</span>' : '<span class="app-badge badge-match">COCOK</span>';
+        statusBadge = isDiff ? '<span class="app-badge badge-diff"><i class="fa-solid fa-triangle-exclamation"></i> SELISIH</span>' : '<span class="app-badge badge-match"><i class="fa-solid fa-circle-check"></i> COCOK</span>';
       }
-      if (item.isMisplaced) statusBadge += ` <span class="app-badge badge-reloc">PINDAH</span>`;
+      if (item.isMisplaced) statusBadge += ` <span class="app-badge badge-reloc"><i class="fa-solid fa-truck-ramp-box"></i> PINDAH</span>`;
 
       tr.innerHTML = `
         <td style="text-align: center; color: var(--text-muted); font-family: var(--font-mono);">${item.no || idx + 1}</td>
@@ -911,10 +1126,13 @@ class CycleCountApp {
         <td style="text-align: center;">${statusBadge}</td>
         <td style="font-size: 0.78rem; color: var(--text-secondary);">
           ${item.note || '-'}
-          ${item.isMisplaced && item.newBin ? `<div style="color: var(--status-reloc); font-weight: 600; margin-top: 0.2rem;">↳ Pindah ke: ${item.newBin}</div>` : ''}
+          ${item.isMisplaced && item.newBin ? `<div style="color: var(--status-reloc); font-weight: 600; margin-top: 0.2rem;"><i class="fa-solid fa-arrow-turn-down"></i> Pindah ke: ${item.newBin}</div>` : ''}
         </td>
         <td style="text-align: center;">
-          <button class="btn-core btn-secondary btn-sm" data-action="tbl-edit">Edit</button>
+          <button class="btn-core btn-secondary btn-sm" data-action="tbl-edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Edit</span>
+          </button>
         </td>
       `;
 
@@ -924,9 +1142,43 @@ class CycleCountApp {
 
       tbody.appendChild(tr);
     });
+
+    // Initialize DataTables
+    if (window.jQuery && $.fn.DataTable) {
+      this.dataTable = $('#master-table').DataTable({
+        pageLength: 10,
+        lengthMenu: [5, 10, 20, 50],
+        order: [[0, 'asc']],
+        destroy: true,
+        language: {
+          search: '<i class="fa-solid fa-magnifying-glass"></i>',
+          searchPlaceholder: 'Filter tabel...',
+          lengthMenu: 'Tampilkan _MENU_ baris',
+          info: '_START_ - _END_ dari _TOTAL_ item',
+          infoEmpty: '0 item',
+          paginate: {
+            first: '<i class="fa-solid fa-angles-left"></i>',
+            previous: '<i class="fa-solid fa-angle-left"></i>',
+            next: '<i class="fa-solid fa-angle-right"></i>',
+            last: '<i class="fa-solid fa-angles-right"></i>'
+          }
+        },
+        drawCallback: () => {
+          // Re-bind click events on table pagination change
+          document.querySelectorAll('[data-action="tbl-edit"]').forEach(btn => {
+            btn.onclick = () => {
+              const row = btn.closest('tr');
+              const matNumber = row.cells[2].textContent.trim();
+              const item = this.items.find(i => i.materialNumber === matNumber);
+              if (item) this.openCheckerInputModal(item);
+            };
+          });
+        }
+      });
+    }
   }
 
-  // ================= 11. OFFICIAL PRINTOUT RENDERING =================
+  // ================= 12. OFFICIAL PRINTOUT RENDERING =================
   renderPrintout() {
     const tbody = document.getElementById('printout-tbody');
     tbody.innerHTML = '';
@@ -967,7 +1219,7 @@ class CycleCountApp {
     });
   }
 
-  // ================= 12. EXPORT CSV & RESET =================
+  // ================= 13. EXPORT CSV & RESET =================
   exportCsv() {
     const headers = ['No', 'BIN', 'Kode Material', 'Deskripsi Material', 'Batch Fisik Vendor', 'Batch SAP', 'Qty SAP', 'Picking', 'Target Net', 'Aktual Fisik', 'Variance', 'Status', 'Catatan'];
     const rows = this.items.map((item, idx) => {
@@ -999,10 +1251,29 @@ class CycleCountApp {
     link.href = url;
     link.download = `Hasil_Cycle_Count_RMPM_${this.schedule.scheduleDate || 'Today'}.csv`;
     link.click();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Export Berhasil',
+      text: 'File CSV hasil rekonsiliasi telah diunduh.',
+      timer: 1400,
+      showConfirmButton: false,
+      customClass: { popup: 'swal-custom-popup' }
+    });
   }
 
-  resetDemoData() {
-    if (confirm('Reset kembali ke 20 data asli dari lembar kertas?')) {
+  async resetDemoData() {
+    const res = await Swal.fire({
+      title: 'Reset ke Data Contoh Asli?',
+      text: 'Data akan dikembalikan ke 20 baris asli dari lembar kertas audit.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-arrows-rotate"></i> Ya, Reset',
+      cancelButtonText: 'Batal',
+      customClass: { popup: 'swal-custom-popup' }
+    });
+
+    if (res.isConfirmed) {
       this.items = [...INITIAL_ITEMS];
       this.calculateUniqueBins();
       this.currentBinIndex = 0;
@@ -1011,13 +1282,27 @@ class CycleCountApp {
       this.renderActiveBinView();
       this.renderDashboard();
       this.renderPrintout();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil Direset',
+        text: 'Data jadwal telah dikembalikan ke kondisi awal lembar fisik.',
+        timer: 1400,
+        showConfirmButton: false,
+        customClass: { popup: 'swal-custom-popup' }
+      });
     }
   }
 
   processSapImport() {
     const raw = document.getElementById('import-text-data').value.trim();
     if (!raw) {
-      alert('Tempelkan data tabel terlebih dahulu!');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Data Masih Kosong',
+        text: 'Tempelkan data tabel ALV Grid SAP terlebih dahulu!',
+        customClass: { popup: 'swal-custom-popup' }
+      });
       return;
     }
 
@@ -1058,10 +1343,22 @@ class CycleCountApp {
       this.currentItemIndexInBin = 0;
       this.saveItems();
       document.getElementById('import-text-data').value = '';
-      alert(`Berhasil mengimpor ${newItems.length} baris jadwal!`);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Import Selesai',
+        text: `Berhasil memuat ${newItems.length} baris jadwal SKU dari SAP!`,
+        customClass: { popup: 'swal-custom-popup' }
+      });
+
       this.switchView('view-checker');
     } else {
-      alert('Format kolom tidak terbaca. Pastikan dipisahkan oleh Tab dari Excel.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Format Tidak Valid',
+        text: 'Format kolom tidak terbaca. Pastikan dipisahkan oleh Tab dari Excel ALV Grid.',
+        customClass: { popup: 'swal-custom-popup' }
+      });
     }
   }
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>RMPM Cycle Count - Supabase Studio Edition</title>
+  <title>RMPM Cycle Count - Enterprise Warehouse Edition</title>
   
   <!-- Pre-render theme detection to prevent flash -->
   <script>
@@ -13,16 +13,25 @@
     })();
   </script>
 
+  <!-- Font Awesome 6 Professional Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.dataTables.min.css">
+
+  <!-- Core App Stylesheet -->
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <!-- ================= 1. UNIFIED TOP NAVBAR ================= -->
+  <!-- ================= 1. UNIFIED ENTERPRISE NAVBAR ================= -->
   <header class="main-navbar">
     <div class="navbar-inner">
       <!-- Brand Logo & System Title -->
       <div class="navbar-brand-group">
-        <div class="brand-icon-box">⚡</div>
+        <div class="brand-icon-box">
+          <i class="fa-solid fa-bolt-lightning"></i>
+        </div>
         <div style="display: flex; flex-direction: column;">
           <div class="brand-text">RMPM Cycle Count</div>
           <span class="brand-subtext">Diamond Warehouse Management</span>
@@ -32,20 +41,20 @@
       <!-- Center Nav Links (Desktop) -->
       <nav class="navbar-nav-links" id="main-nav-links">
         <button class="nav-link-btn active" data-target="view-dashboard" id="tab-nav-dashboard">
-          <span>📊</span>
+          <i class="fa-solid fa-table-cells"></i>
           <span>Table Editor</span>
           <span class="app-badge badge-bin" style="font-size: 0.68rem; padding: 0.1rem 0.4rem;" id="nav-item-count">20</span>
         </button>
         <button class="nav-link-btn" data-target="view-checker" id="tab-nav-checker">
-          <span>📱</span>
+          <i class="fa-solid fa-barcode"></i>
           <span>Mobile Scanner</span>
         </button>
         <button class="nav-link-btn" data-target="view-printout" id="tab-nav-printout">
-          <span>🖨️</span>
+          <i class="fa-solid fa-print"></i>
           <span>Cetak Berita Acara</span>
         </button>
         <button class="nav-link-btn" data-target="view-import" id="tab-nav-import">
-          <span>📥</span>
+          <i class="fa-solid fa-file-import"></i>
           <span>Import SAP</span>
         </button>
       </nav>
@@ -54,12 +63,12 @@
       <div class="navbar-controls">
         <!-- Theme Switcher (Light / Dark) -->
         <button id="btn-theme-toggle" class="theme-toggle-btn" title="Ganti Tema (Light / Dark)">
-          <span id="theme-toggle-icon">🌙</span>
+          <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
         </button>
 
         <!-- Supabase Realtime Status Pill -->
         <button id="btn-supabase-status" class="pill-status-btn" title="Koneksi Realtime Database Supabase">
-          <span id="sb-status-dot">🟢</span>
+          <i class="fa-solid fa-circle" id="sb-status-dot" style="font-size: 8px; color: var(--brand-primary);"></i>
           <span id="sb-status-text">Cloud Sync</span>
         </button>
 
@@ -70,7 +79,7 @@
             <span class="user-chip-name" id="current-user-name">Asep</span>
             <span class="user-chip-role" id="current-user-role">ADMIN</span>
           </div>
-          <span style="font-size: 0.7rem; color: var(--text-muted); margin-left: 2px;">▾</span>
+          <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem; color: var(--text-muted); margin-left: 2px;"></i>
         </div>
       </div>
     </div>
@@ -82,10 +91,13 @@
     <!-- ================= VIEW 1: MASTER TABLE EDITOR & RECONCILIATION ================= -->
     <section class="view-section active" id="view-dashboard">
       
-      <!-- KPI Metric Deck (Generous Spacing, Clean Contrast) -->
+      <!-- KPI Metric Deck -->
       <div class="kpi-deck">
         <div class="kpi-tile glow-brand">
-          <span class="kpi-tile-label">Akurasi Stok (IRA)</span>
+          <span class="kpi-tile-label">
+            <i class="fa-solid fa-chart-pie" style="color: var(--brand-primary); margin-right: 0.35rem;"></i>
+            Akurasi Stok (IRA)
+          </span>
           <div style="display: flex; align-items: baseline; gap: 0.5rem;">
             <span class="kpi-tile-number" id="dash-ira-rate" style="color: var(--brand-primary);">80.0%</span>
             <span class="kpi-tile-meta" id="dash-ira-count">(16 Cocok)</span>
@@ -94,7 +106,10 @@
         </div>
 
         <div class="kpi-tile glow-danger">
-          <span class="kpi-tile-label">Discrepancy (Selisih)</span>
+          <span class="kpi-tile-label">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--status-diff); margin-right: 0.35rem;"></i>
+            Discrepancy (Selisih)
+          </span>
           <div style="display: flex; align-items: baseline; gap: 0.5rem;">
             <span class="kpi-tile-number" id="dash-diff-items" style="color: var(--status-diff);">4 Item</span>
           </div>
@@ -102,7 +117,10 @@
         </div>
 
         <div class="kpi-tile glow-info">
-          <span class="kpi-tile-label">Temuan Salah Lokasi</span>
+          <span class="kpi-tile-label">
+            <i class="fa-solid fa-boxes-packing" style="color: var(--status-reloc); margin-right: 0.35rem;"></i>
+            Temuan Salah Lokasi
+          </span>
           <div style="display: flex; align-items: baseline; gap: 0.5rem;">
             <span class="kpi-tile-number" id="dash-misplaced-items" style="color: var(--status-reloc);">1 Item</span>
           </div>
@@ -110,7 +128,10 @@
         </div>
 
         <div class="kpi-tile">
-          <span class="kpi-tile-label">Total Jadwal SKU</span>
+          <span class="kpi-tile-label">
+            <i class="fa-solid fa-layer-group" style="color: var(--text-muted); margin-right: 0.35rem;"></i>
+            Total Jadwal SKU
+          </span>
           <div style="display: flex; align-items: baseline; gap: 0.5rem;">
             <span class="kpi-tile-number" id="dash-total-items">20</span>
             <span class="kpi-tile-meta">Lot Material</span>
@@ -119,10 +140,38 @@
         </div>
       </div>
 
-      <!-- Action Toolbar (Generous Padding & Clear Alignment) -->
+      <!-- Modern Interactive ApexCharts Analytics Deck -->
+      <div class="chart-deck">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div class="chart-card-title">
+              <i class="fa-solid fa-chart-donut" style="color: var(--brand-primary);"></i>
+              <span>Proporsi Akurasi Fisik (IRA Index)</span>
+            </div>
+            <span class="chart-card-subtitle">Cocok vs Selisih</span>
+          </div>
+          <div id="chart-ira-donut" style="min-height: 240px;"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div class="chart-card-title">
+              <i class="fa-solid fa-chart-column" style="color: var(--status-reloc);"></i>
+              <span>Analisis Discrepancy per BIN (KG)</span>
+            </div>
+            <span class="chart-card-subtitle">Deviasi Fisik vs Target SAP</span>
+          </div>
+          <div id="chart-variance-bar" style="min-height: 240px;"></div>
+        </div>
+      </div>
+
+      <!-- Action Toolbar -->
       <div class="table-toolbar">
         <div class="toolbar-search-group">
-          <input type="text" id="dash-search-input" class="app-input" style="min-width: 260px;" placeholder="🔍 Cari Kode Material, BIN, Batch Vendor...">
+          <div style="position: relative; display: flex; align-items: center;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.75rem; color: var(--text-muted); font-size: 0.8rem;"></i>
+            <input type="text" id="dash-search-input" class="app-input" style="padding-left: 2.1rem; min-width: 250px;" placeholder="Cari Kode Material, BIN, Batch...">
+          </div>
           
           <select id="dash-filter-bin" class="app-select">
             <option value="ALL">Semua BIN / Rak</option>
@@ -134,32 +183,32 @@
 
           <select id="dash-filter-status" class="app-select">
             <option value="ALL">Semua Status</option>
-            <option value="DISCREPANCY">⚠️ Hanya Selisih (Discrepancy)</option>
-            <option value="MATCHED">✅ Hanya Cocok (Matched)</option>
-            <option value="MISPLACED">📦 Pindah Lokasi / Salah BIN</option>
-            <option value="PENDING">⏳ Belum Dihitung</option>
+            <option value="DISCREPANCY">Hanya Selisih (Discrepancy)</option>
+            <option value="MATCHED">Hanya Cocok (Matched)</option>
+            <option value="MISPLACED">Pindah Lokasi / Salah BIN</option>
+            <option value="PENDING">Belum Dihitung</option>
           </select>
         </div>
 
         <div class="toolbar-action-group">
           <button class="btn-core btn-secondary" id="btn-dash-export" title="Export seluruh data rekonsiliasi ke format Excel/CSV">
-            <span>📤</span>
+            <i class="fa-solid fa-file-excel" style="color: #16a34a;"></i>
             <span>Export CSV</span>
           </button>
           <button class="btn-core btn-secondary" id="btn-dash-reset" title="Kembalikan ke data 20 baris lembar fisik">
-            <span>🔄</span>
+            <i class="fa-solid fa-arrows-rotate"></i>
             <span>Reset Contoh</span>
           </button>
           <button class="btn-core btn-primary" id="btn-dash-print">
-            <span>🖨️</span>
+            <i class="fa-solid fa-print"></i>
             <span>Cetak Berita Acara</span>
           </button>
         </div>
       </div>
 
-      <!-- Master Grid Table (Spacious, Clear Contrast, Monospace Numbers) -->
+      <!-- Master Grid Table with DataTables Support -->
       <div class="table-wrapper">
-        <table class="grid-table" id="master-table">
+        <table class="grid-table display" id="master-table" style="width:100%;">
           <thead>
             <tr>
               <th style="width: 45px; text-align: center;">No</th>
@@ -192,19 +241,31 @@
       <!-- Location Stepper Box -->
       <div class="location-stepper-box">
         <div class="bin-nav-row">
-          <button class="btn-core btn-secondary" id="btn-prev-bin" style="min-height: 48px; padding: 0 1.25rem;">◀ Rak Sblm</button>
+          <button class="btn-core btn-secondary" id="btn-prev-bin" style="min-height: 48px; padding: 0 1.25rem;">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span>Rak Sblm</span>
+          </button>
           
           <div class="bin-indicator">
             <span class="bin-title" id="display-active-bin">B.01B.2.01</span>
             <span style="font-size: 0.75rem; color: var(--text-muted);" id="display-active-bin-counter">Rak 1 dari 8 &bull; 1 Item</span>
           </div>
 
-          <button class="btn-core btn-secondary" id="btn-next-bin" style="min-height: 48px; padding: 0 1.25rem;">Rak Lanjut ▶</button>
+          <button class="btn-core btn-secondary" id="btn-next-bin" style="min-height: 48px; padding: 0 1.25rem;">
+            <span>Rak Lanjut</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
         </div>
 
         <div style="display: flex; gap: 0.65rem;">
-          <input type="text" id="mobile-barcode-search" class="app-input" style="flex: 1;" placeholder="🔍 Scan Barcode / Ketik BIN / Batch / SKU...">
-          <button class="btn-core btn-secondary" id="btn-toggle-focus-mode">🎯 Mode Fokus</button>
+          <div style="position: relative; flex: 1; display: flex; align-items: center;">
+            <i class="fa-solid fa-barcode" style="position: absolute; left: 0.85rem; color: var(--brand-primary); font-size: 0.95rem;"></i>
+            <input type="text" id="mobile-barcode-search" class="app-input" style="width: 100%; padding-left: 2.2rem;" placeholder="Scan Barcode / Ketik BIN / Batch / SKU...">
+          </div>
+          <button class="btn-core btn-secondary" id="btn-toggle-focus-mode">
+            <i class="fa-solid fa-crosshairs"></i>
+            <span id="btn-toggle-focus-text">Mode Fokus</span>
+          </button>
         </div>
       </div>
 
@@ -258,31 +319,39 @@
 
           <!-- Notes Callout -->
           <div id="fc-notes-box" style="background-color: var(--status-pending-bg); border-left: 4px solid var(--status-pending); padding: 0.75rem 1rem; border-radius: var(--radius-xs); font-size: 0.82rem; color: var(--status-pending-text);">
-            📝 <strong>Catatan Lapangan:</strong> <span id="fc-note-text">10 Sak KG</span>
+            <i class="fa-regular fa-clipboard" style="margin-right: 0.35rem;"></i>
+            <strong>Catatan Lapangan:</strong> <span id="fc-note-text">10 Sak KG</span>
           </div>
 
-          <!-- Action Buttons (Thumb Optimized for Warehouse Ergonomics) -->
+          <!-- Action Buttons -->
           <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.5rem;">
             <button class="btn-core btn-primary" id="fc-btn-match" style="min-height: 52px; font-size: 1rem;">
-              <span>✅</span>
+              <i class="fa-solid fa-check-double"></i>
               <span id="fc-btn-match-text">Sesuai Target (500 KG)</span>
             </button>
 
             <button class="btn-core btn-secondary" id="fc-btn-input-calc" style="min-height: 48px; font-size: 0.95rem;">
-              <span>✏️</span>
+              <i class="fa-solid fa-calculator"></i>
               <span>Input Fisik / Kalkulator Kemasan</span>
             </button>
 
             <button id="fc-btn-misplaced" style="background: none; border: none; color: var(--status-reloc); font-size: 0.85rem; font-weight: 700; cursor: pointer; padding: 0.5rem; text-align: center;">
-              📦 Laporkan Salah Lokasi (Pindah BIN)
+              <i class="fa-solid fa-truck-ramp-box" style="margin-right: 0.35rem;"></i>
+              Laporkan Salah Lokasi (Pindah BIN)
             </button>
           </div>
 
           <!-- Steppers Inside Rack -->
           <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-main); padding-top: 0.85rem; margin-top: 0.5rem;">
-            <button class="btn-core btn-secondary btn-sm" id="fc-prev-item">◀ Item Sblm</button>
+            <button class="btn-core btn-secondary btn-sm" id="fc-prev-item">
+              <i class="fa-solid fa-angle-left"></i>
+              <span>Item Sblm</span>
+            </button>
             <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 700;" id="fc-item-step-text">Item 1 dari 1</span>
-            <button class="btn-core btn-secondary btn-sm" id="fc-next-item">Item Lanjut ▶</button>
+            <button class="btn-core btn-secondary btn-sm" id="fc-next-item">
+              <span>Item Lanjut</span>
+              <i class="fa-solid fa-angle-right"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -300,7 +369,10 @@
           <strong style="color: var(--text-main); font-size: 1rem;">Dokumen Berita Acara Rekonsiliasi Cycle Count</strong>
           <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">Format resmi A4 Landscape dengan matriks 4 tanda tangan (Checker, SPV, Inventory Control, Accounting).</p>
         </div>
-        <button class="btn-core btn-primary" onclick="window.print()">🖨️ Cetak Dokumen / Simpan PDF</button>
+        <button class="btn-core btn-primary" onclick="window.print()">
+          <i class="fa-solid fa-print"></i>
+          <span>Cetak Dokumen / Simpan PDF</span>
+        </button>
       </div>
 
       <div class="print-document-sheet">
@@ -371,13 +443,19 @@
     <!-- ================= VIEW 4: IMPORT DATA SAP ================= -->
     <section class="view-section" id="view-import">
       <div class="kpi-tile" style="max-width: 800px; margin: 0 auto;">
-        <h3 style="font-size: 1.15rem; color: var(--text-main); margin-bottom: 0.35rem;">📥 Import Jadwal ALV Grid SAP</h3>
+        <h3 style="font-size: 1.15rem; color: var(--text-main); margin-bottom: 0.35rem;">
+          <i class="fa-solid fa-file-import" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
+          Import Jadwal ALV Grid SAP
+        </h3>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.25rem;">
           Salin (Ctrl+C) data langsung dari Microsoft Excel atau SAP GUI ALV Grid dan tempelkan (Ctrl+V) pada kotak di bawah ini:
         </p>
         <textarea id="import-text-data" rows="8" class="app-input" style="height: auto; width: 100%; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.85rem;" placeholder="BIN	Material Number	Batch SAP	Batch Fisik	Exp. Date	Material Description	UoM	Qty SAP	Picking"></textarea>
         <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
-          <button class="btn-core btn-primary" id="btn-process-import">📥 Proses & Muat Jadwal Baru</button>
+          <button class="btn-core btn-primary" id="btn-process-import">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Proses & Muat Jadwal Baru</span>
+          </button>
         </div>
       </div>
     </section>
@@ -387,19 +465,19 @@
   <!-- ================= 3. MOBILE BOTTOM NAVIGATION ================= -->
   <nav class="mobile-bottom-nav">
     <button class="bnav-item" data-target="view-checker">
-      <span style="font-size: 1.15rem;">📱</span>
+      <i class="fa-solid fa-barcode" style="font-size: 1.2rem;"></i>
       <span>Hitung</span>
     </button>
     <button class="bnav-item active" data-target="view-dashboard">
-      <span style="font-size: 1.15rem;">📊</span>
+      <i class="fa-solid fa-table-cells" style="font-size: 1.2rem;"></i>
       <span>Tabel</span>
     </button>
     <button class="bnav-item" data-target="view-printout">
-      <span style="font-size: 1.15rem;">🖨️</span>
+      <i class="fa-solid fa-print" style="font-size: 1.2rem;"></i>
       <span>Cetak BA</span>
     </button>
     <button class="bnav-item" data-target="view-import">
-      <span style="font-size: 1.15rem;">📥</span>
+      <i class="fa-solid fa-file-import" style="font-size: 1.2rem;"></i>
       <span>Import</span>
     </button>
   </nav>
@@ -408,8 +486,13 @@
   <div class="modal-overlay" id="modal-checker-input" style="display: none;">
     <div class="modal-dialog">
       <div class="modal-head">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">✏️ Input Fisik & Kemasan</h3>
-        <button class="btn-core btn-secondary btn-sm" data-close="modal-checker-input">&times;</button>
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
+          <i class="fa-solid fa-boxes-stacked" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
+          Input Fisik & Kemasan
+        </h3>
+        <button class="btn-core btn-secondary btn-sm" data-close="modal-checker-input">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
 
       <div class="modal-body">
@@ -423,7 +506,10 @@
 
         <!-- Packaging Converter Stepper -->
         <div style="background-color: var(--surface-subtle); border: 1px solid var(--border-main); border-radius: var(--radius-sm); padding: 0.85rem;">
-          <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">🧮 Hitung Cepat Kemasan (Sak / Box / Drum):</div>
+          <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-calculator" style="margin-right: 0.35rem;"></i>
+            Hitung Cepat Kemasan (Sak / Box / Drum):
+          </div>
           
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; margin-bottom: 0.75rem;">
             <button type="button" class="btn-core btn-secondary btn-sm btn-pack-preset active" data-weight="25">Sak 25 KG</button>
@@ -436,9 +522,13 @@
 
           <!-- Stepper Buttons -->
           <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <button type="button" class="btn-core btn-secondary" id="btn-pack-minus" style="width: 44px; height: 44px; font-size: 1.25rem;">-</button>
+            <button type="button" class="btn-core btn-secondary" id="btn-pack-minus" style="width: 44px; height: 44px; font-size: 1.1rem;">
+              <i class="fa-solid fa-minus"></i>
+            </button>
             <input type="number" id="calc-pack-qty" class="app-input font-mono" style="text-align: center; font-size: 1.2rem; font-weight: 800; height: 44px; flex: 1;" placeholder="0 Sak">
-            <button type="button" class="btn-core btn-secondary" id="btn-pack-plus" style="width: 44px; height: 44px; font-size: 1.25rem;">+</button>
+            <button type="button" class="btn-core btn-secondary" id="btn-pack-plus" style="width: 44px; height: 44px; font-size: 1.1rem;">
+              <i class="fa-solid fa-plus"></i>
+            </button>
           </div>
 
           <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
@@ -484,8 +574,13 @@
   <div class="modal-overlay" id="modal-user-switcher" style="display: none;">
     <div class="modal-dialog" style="max-width: 440px;">
       <div class="modal-head">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">Pilih Profil Akun</h3>
-        <button class="btn-core btn-secondary btn-sm" data-close="modal-user-switcher">&times;</button>
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
+          <i class="fa-solid fa-users" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
+          Pilih Profil Akun
+        </h3>
+        <button class="btn-core btn-secondary btn-sm" data-close="modal-user-switcher">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
       <div class="modal-body" id="users-list-container">
         <!-- Rendered by JS -->
@@ -500,8 +595,13 @@
   <div class="modal-overlay" id="modal-supabase-config" style="display: none;">
     <div class="modal-dialog" style="max-width: 500px;">
       <div class="modal-head">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">⚡ Koneksi Otomatis Supabase Database</h3>
-        <button class="btn-core btn-secondary btn-sm" data-close="modal-supabase-config">&times;</button>
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
+          <i class="fa-solid fa-database" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
+          Koneksi Otomatis Supabase Database
+        </h3>
+        <button class="btn-core btn-secondary btn-sm" data-close="modal-supabase-config">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
       <div class="modal-body">
         <div>
@@ -516,7 +616,10 @@
           <input type="text" class="app-input font-mono" readonly value="sb_publishable_fmfAwbFQbEsVaW_wGI73uQ_pbpbiQGN" style="width: 100%; font-size: 0.75rem; background: var(--surface-subtle); color: var(--text-muted);">
         </div>
         <div style="background-color: var(--surface-subtle); border: 1px solid var(--border-main); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-secondary);">
-          <strong style="color: var(--brand-primary); display: block; margin-bottom: 0.25rem;">🔒 Mekanisme Database Aman:</strong>
+          <strong style="color: var(--brand-primary); display: block; margin-bottom: 0.25rem;">
+            <i class="fa-solid fa-shield-halved" style="margin-right: 0.3rem;"></i>
+            Mekanisme Database Aman:
+          </strong>
           File <code style="background: var(--surface-main); padding: 0.1rem 0.3rem; border-radius: 3px;">supabase/schema.sql</code> telah dikonfigurasi aman & idempotent (tidak akan menghapus atau menimpa data hitung aktif di database live).
         </div>
       </div>
@@ -527,8 +630,14 @@
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- External Modern Libraries: jQuery, DataTables, SweetAlert2, ApexCharts, Supabase -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Application Modules -->
   <script src="js/config.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/data.js"></script>
