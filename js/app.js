@@ -48,9 +48,13 @@ class CycleCountApp {
     }
 
     // Auto-connect Supabase in background (Zero UI Popup)
-    this.updateCloudStatusUi();
-    if (window.supabaseService && window.supabaseService.isConnected) {
-      await this.initSupabaseSync();
+    if (window.supabaseService) {
+      const isOnline = await window.supabaseService.checkConnection();
+      this.updateCloudStatusUi();
+      if (isOnline) {
+        await this.initSupabaseSync();
+        this.updateCloudStatusUi();
+      }
     }
   }
 
@@ -332,6 +336,66 @@ class CycleCountApp {
       closeLoginBtn.addEventListener('click', () => {
         if (this.auth.isLoggedIn()) {
           document.getElementById('modal-auth-login').style.display = 'none';
+        }
+      });
+    }
+
+    // 4b. Cloud Status Pill Click -> Connection Info / Reconnect
+    const cloudPill = document.querySelector('.pill-status-btn');
+    if (cloudPill) {
+      cloudPill.style.cursor = 'pointer';
+      cloudPill.addEventListener('click', async () => {
+        const isOnline = window.supabaseService ? await window.supabaseService.checkConnection() : false;
+        this.updateCloudStatusUi();
+
+        if (isOnline) {
+          Swal.fire({
+            title: 'Koneksi Supabase Cloud',
+            html: `
+              <div style="text-align: left; font-size: 0.85rem; line-height: 1.6; background: var(--surface-subtle); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-main);">
+                <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 1rem;"></i>
+                  <span style="font-weight: 800; color: var(--text-main);">Status: Tersambung (Online)</span>
+                </div>
+                <div><strong>Project ID:</strong> <span class="font-mono" style="color: var(--brand-primary);">zaxrouzuwryymdolhlix</span></div>
+                <div><strong>Database URL:</strong> <span class="font-mono">zaxrouzuwryymdolhlix.supabase.co</span></div>
+                <div><strong>Protokol:</strong> REST API + Realtime WebSocket</div>
+                <div><strong>Tabel Aktif:</strong> <code>cc_items</code>, <code>cc_schedules</code>, <code>cc_settings</code></div>
+              </div>
+            `,
+            icon: 'success',
+            confirmButtonText: 'Tutup',
+            customClass: { popup: 'swal-custom-popup' }
+          });
+        } else {
+          Swal.fire({
+            title: 'Koneksi Cloud Offline',
+            text: 'Aplikasi saat ini berjalan dalam mode database lokal (offline). Ingin mencoba menyambungkan ulang ke Supabase?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-rotate"></i> Sambungkan Sekarang',
+            cancelButtonText: 'Batal',
+            customClass: { popup: 'swal-custom-popup' }
+          }).then(async (res) => {
+            if (res.isConfirmed) {
+              if (window.supabaseService) {
+                window.supabaseService.init();
+                const rechecked = await window.supabaseService.checkConnection();
+                this.updateCloudStatusUi();
+                if (rechecked) {
+                  await this.initSupabaseSync();
+                  Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil Tersambung',
+                    text: 'Koneksi ke Supabase Cloud zaxrouzuwryymdolhlix telah aktif.',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    customClass: { popup: 'swal-custom-popup' }
+                  });
+                }
+              }
+            }
+          });
         }
       });
     }
@@ -662,14 +726,23 @@ class CycleCountApp {
   updateCloudStatusUi() {
     const dot = document.getElementById('sb-status-dot');
     const text = document.getElementById('sb-status-text');
+    const pill = document.querySelector('.pill-status-btn');
     if (!dot || !text) return;
 
     if (window.supabaseService && window.supabaseService.isConnected) {
-      dot.style.color = 'var(--brand-primary)';
-      text.textContent = 'Cloud Sync: Active';
+      dot.style.color = '#10b981';
+      dot.style.boxShadow = '0 0 8px rgba(16, 185, 129, 0.6)';
+      text.textContent = 'Supabase Cloud';
+      if (pill) {
+        pill.title = 'Terhubung ke Supabase Cloud (zaxrouzuwryymdolhlix). Klik untuk melihat detail status.';
+      }
     } else {
       dot.style.color = 'var(--text-muted)';
+      dot.style.boxShadow = 'none';
       text.textContent = 'Local Database';
+      if (pill) {
+        pill.title = 'Database offline / lokal. Klik untuk menghubungkan ke Supabase Cloud.';
+      }
     }
   }
 

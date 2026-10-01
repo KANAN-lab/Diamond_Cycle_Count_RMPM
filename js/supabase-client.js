@@ -7,33 +7,46 @@ class SupabaseService {
     this.client = null;
     this.isConnected = false;
     this.url = APP_CONFIG.SUPABASE_URL;
-    this.key = APP_CONFIG.SUPABASE_PUBLISHABLE_KEY;
+    this.key = APP_CONFIG.SUPABASE_ANON_KEY || APP_CONFIG.SUPABASE_PUBLISHABLE_KEY;
     this.init();
   }
 
   init() {
-    this.url = (localStorage.getItem('rmpm_supabase_url') || APP_CONFIG.SUPABASE_URL || '').trim();
-    this.key = APP_CONFIG.SUPABASE_PUBLISHABLE_KEY;
+    const storedUrl = localStorage.getItem('rmpm_supabase_url');
+    this.url = (storedUrl && storedUrl.includes('supabase.co')) ? storedUrl.trim() : APP_CONFIG.SUPABASE_URL;
+    this.key = APP_CONFIG.SUPABASE_ANON_KEY || APP_CONFIG.SUPABASE_PUBLISHABLE_KEY;
 
     if (this.url) {
-      // Auto-normalize URL (add https:// if missing, remove trailing slash)
       if (!this.url.startsWith('http://') && !this.url.startsWith('https://')) {
         this.url = 'https://' + this.url;
       }
       this.url = this.url.replace(/\/+$/, '');
+      localStorage.setItem('rmpm_supabase_url', this.url);
     }
 
     if (this.url && this.key && window.supabase) {
       try {
         this.client = window.supabase.createClient(this.url, this.key);
         this.isConnected = true;
-        console.log('[Supabase] Initialized automatically with:', this.url);
+        console.log('[Supabase Cloud] Initialized with:', this.url);
       } catch (err) {
-        console.warn('[Supabase] Init failed:', err);
+        console.warn('[Supabase Cloud] Init failed:', err);
         this.isConnected = false;
       }
     } else {
       this.isConnected = false;
+    }
+  }
+
+  async checkConnection() {
+    if (!this.client) return false;
+    try {
+      const { error } = await this.client.from('cc_items').select('id').limit(1);
+      this.isConnected = !error;
+      return this.isConnected;
+    } catch (e) {
+      this.isConnected = false;
+      return false;
     }
   }
 

@@ -27,15 +27,25 @@
 ---
 
 ### FASE 2: CLOUD STACK & SAFE DATABASE MIGRATION (COMPLETED)
-- [x] **Setup Supabase PostgreSQL & Schema Migration:**
+- [x] **Setup Supabase PostgreSQL & Schema Migration v2.5 Enterprise:**
   - File: `supabase/schema.sql`
-  - Tabel `cc_items` & `cc_schedules`.
+  - Tabel `cc_items`, `cc_schedules`, `cc_settings`, `cc_audit_logs`, dan SQL View `v_cc_reconciliation`.
   - **Prinsip Keamanan Idempoten:** Menjamin tidak ada perintah destruktif (`DROP`/`TRUNCATE`) yang menghapus atau menimpa data hitung aktif di database live.
   - Penambahan kolom aman menggunakan blok `DO $$ BEGIN ... EXCEPTION ... END $$;`.
   - Aktivasi Realtime Publication (`supabase_realtime`) untuk sinkronisasi dua arah.
+  - Indeks performa tinggi pada kolom `bin`, `material_number`, dan `batch_sap`.
+- [x] **Koneksi Live Database Supabase Cloud:**
+  - Terkoneksi langsung ke project user: `zaxrouzuwryymdolhlix.supabase.co`
+  - Inisialisasi otomatis via token anon JWT publik + fallback publishable key.
+  - Indikator status navbar real-time: `[ • Supabase Cloud ]` warna hijau (#10b981) dengan dialog modal detail koneksi SweetAlert2.
+  - Sinkronisasi pengaturan admin (`cc_settings`) dan audit log (`cc_audit_logs`).
+  - Verifikasi REST API: HTTP 200 OK dengan 3 record aktif tersambung.
+- [x] **Penyelesaian Console Error & Web Health:**
+  - Mengatasi `ReferenceError: STORAGE_KEYS is not defined` di `js/app.js`.
+  - Mengatasi `404 /favicon.ico` dengan inline SVG favicon dan server route handler 204.
 - [x] **Integrasi Cloud Deployment:**
   - Konfigurasi Vercel auto-deploy (`vercel.json`) terhubung ke GitHub remote.
-  - Setup kunci API publishable di `js/config.js`.
+  - Setup konfigurasi di `js/config.js`.
 
 ---
 
