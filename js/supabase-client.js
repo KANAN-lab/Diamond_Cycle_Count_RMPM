@@ -1,0 +1,139 @@
+// ==============================================================================
+// Supabase Cloud Realtime Connector
+// ==============================================================================
+
+class SupabaseService {
+  constructor() {
+    this.client = null;
+    this.isConnected = false;
+    this.url = APP_CONFIG.SUPABASE_URL;
+    this.key = APP_CONFIG.SUPABASE_PUBLISHABLE_KEY;
+    this.init();
+  }
+
+  init() {
+    if (this.url && this.key && window.supabase) {
+      try {
+        this.client = window.supabase.createClient(this.url, this.key);
+        this.isConnected = true;
+        console.log('[Supabase] Initialized successfully with:', this.url);
+      } catch (err) {
+        console.warn('[Supabase] Init failed:', err);
+        this.isConnected = false;
+      }
+    } else {
+      this.isConnected = false;
+    }
+  }
+
+  setUrl(newUrl) {
+    this.url = newUrl.trim();
+    localStorage.setItem('rmpm_supabase_url', this.url);
+    APP_CONFIG.SUPABASE_URL = this.url;
+    this.init();
+  }
+
+  // Fetch all items from Supabase
+  async fetchItems() {
+    if (!this.isConnected || !this.client) return null;
+    try {
+      const { data, error } = await this.client
+        .from('cc_items')
+        .select('*')
+        .order('no', { ascending: true });
+
+      if (error) {
+        console.warn('[Supabase] Error fetching items:', error);
+        return null;
+      }
+
+      if (data && data.length > 0) {
+        // Map database column snake_case to app camelCase
+        return data.map(d => ({
+          id: d.id,
+          scheduleId: d.schedule_id,
+          no: d.no,
+          bin: d.bin,
+          materialNumber: d.material_number,
+          batchSap: d.batch_sap,
+          batchFisik: d.batch_fisik,
+          expDate: d.exp_date,
+          materialDesc: d.material_desc,
+          uom: d.uom,
+          qtySap: parseFloat(d.qty_sap) || 0,
+          pickingQty: parseFloat(d.picking_qty) || 0,
+          actualQty: d.actual_qty !== null ? parseFloat(d.actual_qty) : null,
+          unitConversion: d.unit_conversion || '',
+          note: d.note || '',
+          isMisplaced: !!d.is_misplaced,
+          newBin: d.new_bin || '',
+          status: d.status || 'PENDING',
+          countedBy: d.counted_by || '',
+          countedAt: d.counted_at || ''
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.warn('[Supabase] Exception fetching items:', err);
+      return null;
+    }
+  }
+
+  // Save / update single item to Supabase
+  async syncItem(item) {
+    if (!this.isConnected || !this.client) return;
+
+    try {
+      const payload = {
+        id: item.id,
+        actual_qty: item.actualQty,
+        note: item.note,
+        is_misplaced: item.isMisplaced,
+        new_bin: item.newBin,
+        status: item.status,
+        counted_by: item.countedBy,
+        counted_at: item.countedAt || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await this.client
+        .from('cc_items')
+        .update(payload)
+        .eq('id', item.id);
+
+      if (error) {
+        console.warn('[Supabase] Sync item failed:', error);
+      } else {
+        console.log('[Supabase] Item synced successfully:', item.id);
+      }
+    } catch (err) {
+      console.warn('[Supabase] Error syncing item:', err);
+    }
+  }
+
+  // Subscribe to real-time updates across devices (checker <-> admin)
+  subscribeToChanges(onItemChange) {
+    if (!this.isConnected || !this.client) return null;
+
+    try {
+      return this.client
+        .channel('public:cc_items')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'cc_items' },
+          (payload) => {
+            console.log('[Supabase Realtime] Change received:', payload);
+            if (onItemChange) {
+              onItemChange(payload);
+            }
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('[Supabase] Realtime subscription error:', err);
+      return null;
+    }
+  }
+}
+
+window.supabaseService = new SupabaseService();

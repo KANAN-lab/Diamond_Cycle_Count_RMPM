@@ -1,0 +1,18 @@
+{
+  "name": "rmpm-cycle-count-system",
+  "version": "1.0.0",
+  "description": "Paperless Cycle Count & Reconciliation System for RMPM Warehouse",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "cycle-count",
+    "rmpm",
+    "warehouse",
+    "inventory-accuracy"
+  ],
+  "author": "RMPM Operations",
+  "license": "ISC"
+}

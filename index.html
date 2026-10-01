@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RMPM Cycle Count & Reconciliation System</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Top Application Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-section">
+        <span class="brand-badge">RMPM</span>
+        <div>
+          <div class="brand-title">Cycle Count & Inventory Accuracy</div>
+          <div class="brand-subtitle">Gudang Raw Material & Packaging Material</div>
+        </div>
+      </div>
+
+      <div class="header-meta">
+        <div class="meta-pill">
+          <span>📅</span>
+          <span>Jadwal: <strong id="header-schedule-date">21-Sep-2026</strong></span>
+        </div>
+        <div class="meta-pill">
+          <span>📍</span>
+          <span>Area: <strong id="header-schedule-area">Zone B (B.01 & B.02)</strong></span>
+        </div>
+        <div class="meta-pill">
+          <span>👤</span>
+          <span>SPV: <strong id="header-schedule-spv">SPV ASEP</strong></span>
+        </div>
+
+        <!-- Cloud & Supabase Status -->
+        <button id="btn-supabase-status" class="meta-pill" style="cursor: pointer; border: 1px solid #0284c7; background: #0c4a6e;" title="Konfigurasi Koneksi Supabase">
+          <span id="sb-status-dot">🟡</span>
+          <span id="sb-status-text">Supabase: Setup URL</span>
+        </button>
+
+        <!-- Active User & Switcher -->
+        <div class="user-switch-bar">
+          <div class="user-avatar" id="user-avatar-initial">A</div>
+          <div class="user-info">
+            <span class="user-name" id="current-user-name">Asep Saepullah</span>
+            <span class="user-role-badge" id="current-user-role">ADMINISTRATOR / SPV</span>
+          </div>
+          <button class="btn-switch-user" id="btn-open-user-modal" title="Ganti Akun">Ganti Akun ▾</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Bar -->
+  <nav class="nav-tab-container">
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-target="view-dashboard" id="tab-dashboard">
+        <span>📊 Dashboard Rekonsiliasi</span>
+        <span class="tab-badge" id="tab-total-badge">20</span>
+      </button>
+      <button class="nav-tab" data-target="view-checker" id="tab-checker">
+        <span>📱 Input Lapangan (Checker Mode)</span>
+        <span class="tab-badge" id="tab-pending-badge">0</span>
+      </button>
+      <button class="nav-tab" data-target="view-printout" id="tab-printout">
+        <span>🖨️ Cetak Berita Acara (Sign-Off ACC & WH)</span>
+      </button>
+      <button class="nav-tab" data-target="view-import" id="tab-import">
+        <span>📥 Import Data SAP</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="app-content">
+
+    <!-- ================= VIEW 1: DASHBOARD REKONSILIASI (ADMIN / SPV) ================= -->
+    <section class="view-section active" id="view-dashboard">
+      <!-- KPI Overview Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card highlight-primary">
+          <span class="kpi-label">Total Item Terjadwal</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-total-items">20</span>
+            <span class="kpi-sub">SKU/Batch</span>
+          </div>
+          <span class="kpi-sub" id="kpi-total-sap-weight">Total SAP: 9,286.6 KG</span>
+        </div>
+
+        <div class="kpi-card highlight-success">
+          <span class="kpi-label">Akurasi Stok (IRA)</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-ira-rate">80.0%</span>
+            <span class="kpi-sub" id="kpi-ira-count">(16 Cocok)</span>
+          </div>
+          <span class="kpi-sub">Target Minimal: &ge; 98%</span>
+        </div>
+
+        <div class="kpi-card highlight-danger">
+          <span class="kpi-label">Discrepancy (Selisih)</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-discrepancy-items">4</span>
+            <span class="kpi-sub">Item Bermasalah</span>
+          </div>
+          <span class="kpi-sub" id="kpi-net-variance">Net Selisih: -667.6 KG</span>
+        </div>
+
+        <div class="kpi-card highlight-warning">
+          <span class="kpi-label">Progres Hitung Fisik</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-progress-rate">100%</span>
+            <span class="kpi-sub" id="kpi-progress-fraction">(20 / 20)</span>
+          </div>
+          <span class="kpi-sub" id="kpi-pending-items">0 item menunggu hitung</span>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid var(--status-misplaced);">
+          <span class="kpi-label">Temuan Salah Lokasi</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-misplaced-count">1</span>
+            <span class="kpi-sub">Barang Pindah BIN</span>
+          </div>
+          <span class="kpi-sub">Perlu Transfer Posting SAP</span>
+        </div>
+      </div>
+
+      <!-- Action & Filter Bar -->
+      <div class="control-bar">
+        <div class="filter-group">
+          <input type="text" id="dash-search-input" class="search-input" placeholder="🔍 Cari Material, BIN, atau Batch...">
+          
+          <select id="dash-filter-bin" class="select-filter">
+            <option value="ALL">Semua BIN / Rak</option>
+            <option value="B.01A">Zona B.01A</option>
+            <option value="B.01B">Zona B.01B</option>
+            <option value="B.02A">Zona B.02A</option>
+            <option value="B.02B">Zona B.02B</option>
+          </select>
+
+          <select id="dash-filter-status" class="select-filter">
+            <option value="ALL">Semua Status</option>
+            <option value="DISCREPANCY">⚠️ Hanya Selisih (Discrepancy)</option>
+            <option value="MATCHED">✅ Hanya Cocok (Matched)</option>
+            <option value="MISPLACED">📦 Pindah Lokasi / Salah BIN</option>
+            <option value="PENDING">⏳ Belum Dihitung</option>
+          </select>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-secondary btn-sm" id="btn-export-csv" title="Export CSV untuk Rekonsiliasi">📤 Export Excel/CSV</button>
+          <button class="btn btn-secondary btn-sm" id="btn-reset-demo" title="Kembalikan data ke contoh kertas fisik">🔄 Reset Data Contoh</button>
+          <button class="btn btn-primary btn-sm" id="btn-go-to-print">🖨️ Cetak Berita Acara</button>
+        </div>
+      </div>
+
+      <!-- Master Reconciliation Table -->
+      <div class="table-responsive">
+        <table class="master-table" id="master-rec-table">
+          <thead>
+            <tr>
+              <th class="text-center" style="width: 40px;">No</th>
+              <th style="width: 100px;">BIN</th>
+              <th style="width: 90px;">Kode Mat</th>
+              <th>Deskripsi Material</th>
+              <th style="width: 105px;">Batch SAP</th>
+              <th style="width: 140px;">Batch Fisik</th>
+              <th style="width: 85px;">Exp. Date</th>
+              <th class="text-center" style="width: 45px;">UoM</th>
+              <th class="text-right" style="width: 80px;">Qty SAP</th>
+              <th class="text-right" style="width: 70px;">Picking</th>
+              <th class="text-right" style="width: 80px;">Target Net</th>
+              <th class="text-right" style="width: 85px;">Fisik Aktual</th>
+              <th class="text-right" style="width: 85px;">Variance</th>
+              <th class="text-center" style="width: 95px;">Status</th>
+              <th>Catatan Lapangan</th>
+              <th class="text-center" style="width: 85px;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="master-table-body">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 2: CHECKER FIELD MODE ================= -->
+    <section class="view-section" id="view-checker">
+      <div class="control-bar" style="margin-bottom: 0.75rem;">
+        <div class="filter-group" style="width: 100%;">
+          <input type="text" id="checker-search-input" class="search-input" style="flex: 1;" placeholder="🔍 Scan Barcode / Ketik BIN atau Material...">
+          <select id="checker-status-filter" class="select-filter">
+            <option value="ALL">Semua Kondisi</option>
+            <option value="PENDING">Belum Dihitung</option>
+            <option value="DISCREPANCY">Ada Selisih</option>
+            <option value="MATCHED">Sesuai / Cocok</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick BIN Selector Pills -->
+      <div class="checker-bin-scroller" id="checker-bin-pills">
+        <button class="bin-pill-btn active" data-bin="ALL">Semua Rak</button>
+        <!-- Injected via JS -->
+      </div>
+
+      <!-- Item Cards for Mobile / Touch Devices -->
+      <div class="cards-grid" id="checker-cards-container">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- ================= VIEW 3: CETAK BERITA ACARA RESMI (A4 LANDSCAPE) ================= -->
+    <section class="view-section" id="view-printout">
+      <div class="print-actions-bar">
+        <div>
+          <strong>Pratinjau Cetak Berita Acara Hasil Cycle Count</strong>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Format resmi A4 Landscape dengan matriks 4 tanda tangan (Checker, SPV, Inventory Control, Accounting).</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="btn-back-to-dash">⬅️ Kembali ke Dashboard</button>
+          <button class="btn btn-primary" onclick="window.print()">🖨️ Cetak Dokumen / Simpan PDF</button>
+        </div>
+      </div>
+
+      <!-- The Printable Document Container -->
+      <div class="print-document-sheet" id="printable-doc">
+        <!-- Document Header -->
+        <div class="doc-header">
+          <div>
+            <div class="doc-company-title">PT INDUSTRI PANGAN NUSANTARA</div>
+            <div class="doc-sub-title">Warehouse & Supply Chain Division &bull; RMPM Storage Department</div>
+          </div>
+          <div style="text-align: right; font-size: 8.5pt;">
+            <div><strong>No. Dokumen:</strong> <span id="print-doc-no">BA-CC-RMPM/2026/09/21-01</span></div>
+            <div><strong>Hal:</strong> 1 dari 1</div>
+            <div><strong>Status Dokumen:</strong> RESMI / AUDIT-READY</div>
+          </div>
+        </div>
+
+        <div class="doc-title-main">
+          <h1>BERITA ACARA HASIL CYCLE COUNT & REKONSILIASI STOK</h1>
+          <p>Pelaksanaan Penghitungan Fisik Berkala Material Raw & Packaging (RMPM)</p>
+        </div>
+
+        <!-- Document Metadata -->
+        <table class="doc-meta-table">
+          <tr>
+            <td style="width: 18%;"><strong>Tanggal Pelaksanaan</strong></td>
+            <td style="width: 32%;">: <span id="print-date">21 September 2026</span></td>
+            <td style="width: 18%;"><strong>Pengawas (SPV)</strong></td>
+            <td style="width: 32%;">: <span id="print-spv">SPV ASEP</span></td>
+          </tr>
+          <tr>
+            <td><strong>Lokasi / Zona Rak</strong></td>
+            <td>: <span id="print-area">RMPM Warehouse - Zone B (B.01 & B.02)</span></td>
+            <td><strong>Kategori Material</strong></td>
+            <td>: Raw Material & Packaging Material</td>
+          </tr>
+        </table>
+
+        <!-- Executive Summary Box -->
+        <div class="doc-summary-box">
+          <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt;">
+            <tr>
+              <td style="width: 25%;"><strong>Total Item Dihitung:</strong> <span id="print-sum-total">20</span> Item</td>
+              <td style="width: 25%;"><strong>Sesuai (Match):</strong> <span id="print-sum-matched">16</span> Item</td>
+              <td style="width: 25%;"><strong>Selisih (Discrepancy):</strong> <span id="print-sum-diff">4</span> Item</td>
+              <td style="width: 25%;"><strong>Akurasi Stok (IRA):</strong> <strong id="print-sum-ira" style="font-size: 10pt;">80.0%</strong></td>
+            </tr>
+            <tr>
+              <td colspan="4" style="padding-top: 0.35rem; color: #444;">
+                <em>Catatan Evaluasi: 1 item ditemukan salah letak (pindah BIN), 1 item selisih akibat proses picking berjalan (FL-2), 2 item perlu investigasi posting transfer/scrap.</em>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Printable Reconciliation Table -->
+        <table class="doc-data-table">
+          <thead>
+            <tr>
+              <th style="width: 25px;">No</th>
+              <th style="width: 75px;">BIN</th>
+              <th style="width: 65px;">Kode Mat</th>
+              <th>Deskripsi Material</th>
+              <th style="width: 80px;">Batch SAP</th>
+              <th style="width: 110px;">Batch Fisik</th>
+              <th style="width: 65px;">Exp. Date</th>
+              <th style="width: 30px;">UoM</th>
+              <th style="width: 60px; text-align: right;">Qty SAP</th>
+              <th style="width: 50px; text-align: right;">Picking</th>
+              <th style="width: 60px; text-align: right;">Target Net</th>
+              <th style="width: 60px; text-align: right;">Aktual</th>
+              <th style="width: 60px; text-align: right;">Variance</th>
+              <th style="width: 65px; text-align: center;">Status</th>
+              <th style="width: 140px;">Keterangan Lapangan</th>
+            </tr>
+          </thead>
+          <tbody id="print-table-body">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+
+        <!-- Signatures Matrix -->
+        <div class="doc-signatures-grid">
+          <div class="sig-col">
+            <div class="sig-title">Dihitung Oleh (Checker)</div>
+            <div class="sig-space"></div>
+            <div class="sig-name">
+              <strong>BUDI SANTOSO</strong><br>
+              <span style="font-size: 7.5pt; color: #555;">Petugas Cycle Count</span>
+            </div>
+          </div>
+
+          <div class="sig-col">
+            <div class="sig-title">Diperiksa Oleh (SPV RMPM)</div>
+            <div class="sig-space"></div>
+            <div class="sig-name">
+              <strong>ASEP SAEPULLAH</strong><br>
+              <span style="font-size: 7.5pt; color: #555;">Supervisor Warehouse</span>
+            </div>
+          </div>
+
+          <div class="sig-col">
+            <div class="sig-title">Diverifikasi (Inventory Control)</div>
+            <div class="sig-space"></div>
+            <div class="sig-name">
+              <strong>HENDRA WIJAYA</strong><br>
+              <span style="font-size: 7.5pt; color: #555;">Inventory Controller</span>
+            </div>
+          </div>
+
+          <div class="sig-col">
+            <div class="sig-title">Disetujui Oleh (Accounting)</div>
+            <div class="sig-space"></div>
+            <div class="sig-name">
+              <strong>SITI RAHAYU, SE.</strong><br>
+              <span style="font-size: 7.5pt; color: #555;">Cost & Inventory Accounting</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 4: IMPORT DATA SAP ================= -->
+    <section class="view-section" id="view-import">
+      <div style="max-width: 900px; margin: 0 auto; background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <h2 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Import Jadwal & Data Tarikan SAP</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          Anda dapat menyalin data langsung dari tabel Excel / SAP ALV Grid dan menempelkannya (paste) ke kotak di bawah.
+        </p>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label class="form-label">Urutan Kolom Format Data (Tab-Delimited dari Excel):</label>
+          <div style="font-size: 0.75rem; background: var(--bg-subtle); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-family: var(--font-mono); color: var(--brand-navy);">
+            BIN &bull; Material Number &bull; Batch SAP &bull; Batch Fisik &bull; Exp. Date &bull; Material Description &bull; UoM &bull; Qty Base On SAP &bull; Picking qty
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label class="form-label" for="import-text-data">Tempel (Paste) Data Tabel Disini:</label>
+          <textarea id="import-text-data" rows="8" class="form-input" style="font-family: var(--font-mono); font-size: 0.8rem;" placeholder="B.01B.2.01	40000210	4000079065	25391003-PALSGA	22-Sep-27	MONO & DI GLYCERIDE (DMG 0097)	KG	500.000	0.000"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button class="btn btn-secondary" id="btn-cancel-import">Batal</button>
+          <button class="btn btn-primary" id="btn-process-import">📥 Proses & Muat ke Jadwal Count</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL 1: GANTI AKUN / ROLE SWITCHER ================= -->
+  <div class="modal-overlay" id="modal-user-switcher" style="display: none;">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Pilih Akun Pengguna</h3>
+        <button class="btn-close-modal" data-close="modal-user-switcher">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: var(--text-muted);">
+          Silakan pilih akun sesuai peran untuk melihat tampilan yang relevan:
+        </p>
+        <div id="users-list-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="modal-user-switcher">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 2: INPUT AKTUAL & KALKULATOR KEMASAN ================= -->
+  <div class="modal-overlay" id="modal-checker-input" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-item-title">Input Hasil Hitung Fisik</h3>
+        <button class="btn-close-modal" data-close="modal-checker-input">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Target Summary Box -->
+        <div style="background-color: var(--bg-subtle); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <span>BIN: <strong id="m-item-bin">B.01B.2.01</strong></span>
+            <span>Batch Fisik: <strong id="m-item-batch-fisik">25391003-PALSGA</strong></span>
+          </div>
+          <div style="margin-bottom: 0.25rem;">
+            <strong id="m-item-desc">MONO & DI GLYCERIDE</strong> (<span id="m-item-code">40000210</span>)
+          </div>
+          <div style="display: flex; gap: 1rem; color: var(--text-muted); font-size: 0.75rem;">
+            <span>SAP: <strong id="m-item-sap">500.00</strong> KG</span>
+            <span>Picking: <strong id="m-item-picking">0.00</strong> KG</span>
+            <span>Target Net: <strong id="m-item-net" style="color: var(--brand-primary-hover);">500.00</strong> KG</span>
+          </div>
+        </div>
+
+        <!-- Packaging Converter Helper -->
+        <div class="packaging-calc-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: var(--brand-navy);">🧮 Kalkulator Kemasan Fisik (Sak / Box / Roll):</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">Opsional konversi cepat</span>
+          </div>
+          <div class="calc-grid">
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.7rem;">Tipe Kemasan</label>
+              <select id="calc-pack-type" class="form-input" style="padding: 0.35rem 0.5rem; font-size: 0.75rem;">
+                <option value="25">Sak @ 25 KG</option>
+                <option value="20">Sak @ 20 KG</option>
+                <option value="17.5">Box @ 17.5 KG</option>
+                <option value="12">Box @ 12 KG</option>
+                <option value="200">Drum @ 200 KG</option>
+                <option value="custom">Berat Custom...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.7rem;">Jumlah Kemasan Utuh</label>
+              <input type="number" id="calc-pack-qty" class="form-input" placeholder="Misal: 10" style="padding: 0.35rem 0.5rem; font-size: 0.75rem;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.7rem;">+ Sisa / Parsial (KG)</label>
+              <input type="number" id="calc-pack-partial" class="form-input" placeholder="0" style="padding: 0.35rem 0.5rem; font-size: 0.75rem;">
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-apply-calc" style="margin-top: 0.5rem; width: 100%;">Terapkan Hitungan ke Qty Aktual</button>
+        </div>
+
+        <!-- Direct Actual Input -->
+        <div class="form-group">
+          <label class="form-label" for="input-actual-qty">Kuantitas Fisik Aktual (KG): <span style="color: red;">*</span></label>
+          <input type="number" step="0.001" id="input-actual-qty" class="form-input" style="font-size: 1.15rem; font-weight: 700; color: var(--brand-primary);" placeholder="0.000">
+        </div>
+
+        <!-- Misplaced Checkbox & New BIN -->
+        <div style="background-color: var(--bg-subtle); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm);">
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+            <input type="checkbox" id="check-is-misplaced">
+            <span>Barang Pindah Lokasi / Salah Letak Rak</span>
+          </label>
+          <div id="misplaced-input-box" style="display: none; margin-top: 0.5rem;">
+            <label class="form-label" style="font-size: 0.75rem;">BIN Baru / Lokasi Ditemukan:</label>
+            <input type="text" id="input-new-bin" class="form-input" placeholder="Contoh: B.01A.5.01" style="font-family: var(--font-mono);">
+          </div>
+        </div>
+
+        <!-- Note / Condition -->
+        <div class="form-group">
+          <label class="form-label" for="input-item-note">Catatan Lapangan & Kondisi:</label>
+          <input type="text" id="input-item-note" class="form-input" placeholder="Contoh: 10 Sak KG, Kemasan robek, atau Sedang proses picking FL-2">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="modal-checker-input">Batal</button>
+        <button class="btn btn-primary" id="btn-save-checker-input">Simpan Hasil Hitung</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 3: KONFIGURASI SUPABASE CLOUD ================= -->
+  <div class="modal-overlay" id="modal-supabase-config" style="display: none;">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">⚡ Konfigurasi Supabase Cloud</h3>
+        <button class="btn-close-modal" data-close="modal-supabase-config">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: var(--text-muted);">
+          Koneksi ke Supabase Database memungkinkan sinkronisasi real-time antar-perangkat (Checker di rak langsung ter-update di Dashboard SPV/Accounting).
+        </p>
+        
+        <div class="form-group">
+          <label class="form-label" for="cfg-supabase-url">Supabase Project URL:</label>
+          <input type="url" id="cfg-supabase-url" class="form-input" placeholder="https://xxxxxxxxxxxx.supabase.co" style="font-family: var(--font-mono); font-size: 0.85rem;">
+          <span style="font-size: 0.7rem; color: var(--text-muted);">Dapatkan dari: Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project URL</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Publishable / Anon Key:</label>
+          <input type="text" id="cfg-supabase-key" class="form-input" readonly value="sb_publishable_fmfAwbFQbEsVaW_wGI73uQ_pbpbiQGN" style="font-family: var(--font-mono); font-size: 0.75rem; background: #f1f5f9;">
+        </div>
+
+        <div style="background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.65rem; font-size: 0.75rem;">
+          <strong>Petunjuk Database:</strong>
+          <p style="margin-top: 0.25rem; color: var(--text-muted);">File schema SQL lengkap telah disiapkan di <code style="color: #0284c7;">supabase/schema.sql</code>. Cukup salin isi file tersebut dan jalankan di Supabase SQL Editor.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="modal-supabase-config">Tutup</button>
+        <button class="btn btn-primary" id="btn-save-supabase-config">Hubungkan ke Supabase</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase CDN Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
