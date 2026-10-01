@@ -1,9 +1,19 @@
 -- ==============================================================================
 -- RMPM Cycle Count Database Schema for Supabase (Safe & Idempotent Migration)
--- GUARANTEE: Does NOT drop, truncate, or overwrite live user count data!
+-- VERSION: v2.5 Enterprise Production
+-- GUARANTEE: Idempotent & Non-Destructive!
+-- Does NOT drop, truncate, or overwrite live user count records!
 -- ==============================================================================
 
--- 1. Schedules Table (Safe Creation)
+-- 0. Required Extensions (Safe)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ==============================================================================
+-- 1. CORE TABLES DEFINITIONS (CREATE TABLE IF NOT EXISTS)
+-- ==============================================================================
+
+-- 1.1 Schedules Table
 CREATE TABLE IF NOT EXISTS public.cc_schedules (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   doc_no TEXT NOT NULL,
@@ -16,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.cc_schedules (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Items Table (Safe Creation)
+-- 1.2 Inventory Items Table (Cycle Count SKU & Physical Findings)
 CREATE TABLE IF NOT EXISTS public.cc_items (
   id TEXT PRIMARY KEY,
   schedule_id TEXT,
@@ -42,20 +52,56 @@ CREATE TABLE IF NOT EXISTS public.cc_items (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Users Table (Safe Creation)
+-- 1.3 Users Table (Role-Based Access Control)
 CREATE TABLE IF NOT EXISTS public.cc_users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   role TEXT NOT NULL,
   name TEXT NOT NULL,
   title TEXT,
-  badge TEXT
+  badge TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Safe Foreign Key & Column Additions (Won't fail if already exist)
+-- 1.4 System Settings & Customization Table (Zero Hardcode Support)
+CREATE TABLE IF NOT EXISTS public.cc_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default_settings',
+  company_name TEXT NOT NULL DEFAULT 'PT INDUSTRI PANGAN NUSANTARA',
+  division_name TEXT DEFAULT 'Warehouse & Supply Chain Division',
+  department_name TEXT DEFAULT 'RMPM Department',
+  doc_number_format TEXT DEFAULT 'BA-CC-RMPM/2026/09/21-01',
+  ira_target_percent NUMERIC(5, 2) DEFAULT 98.0,
+  sig_checker_name TEXT DEFAULT 'BUDI SANTOSO',
+  sig_checker_position TEXT DEFAULT 'Petugas Cycle Count',
+  sig_spv_name TEXT DEFAULT 'ASEP SAEPULLAH',
+  sig_spv_position TEXT DEFAULT 'Supervisor Warehouse',
+  sig_controller_name TEXT DEFAULT 'HENDRA WIJAYA',
+  sig_controller_position TEXT DEFAULT 'Inventory Controller',
+  sig_accounting_name TEXT DEFAULT 'SITI RAHAYU, SE.',
+  sig_accounting_position TEXT DEFAULT 'Cost & Inventory Accounting',
+  updated_by TEXT DEFAULT 'ADMIN',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 1.5 Audit Trail & Activity Logs (ISO / WMS Audit Compliance)
+CREATE TABLE IF NOT EXISTS public.cc_audit_logs (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  schedule_id TEXT,
+  item_id TEXT,
+  action_type TEXT NOT NULL, -- e.g. COUNT_SAVED, QUICK_MATCH, MISPLACED_FLAG, DUMMY_CLEARED, DUMMY_RELOADED, SETTINGS_SAVED, SAP_IMPORTED, AUTH_LOGIN, AUTH_LOGOUT
+  performed_by TEXT NOT NULL,
+  role TEXT NOT NULL,
+  details JSONB DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- 2. SAFE COLUMN & CONSTRAINT ALTERATIONS (IDEMPOTENT BLOCKS)
+-- ==============================================================================
 DO $$
 BEGIN
-  -- Add foreign key if not exists
+  -- Foreign Key cc_items -> cc_schedules
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'fk_cc_items_schedule'
   ) THEN
@@ -64,7 +110,7 @@ BEGIN
     FOREIGN KEY (schedule_id) REFERENCES public.cc_schedules(id) ON DELETE CASCADE;
   END IF;
 
-  -- Ensure columns exist without disrupting existing data
+  -- Ensure all new columns exist on cc_items without failing if already present
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_items' AND column_name = 'unit_conversion') THEN
     ALTER TABLE public.cc_items ADD COLUMN unit_conversion TEXT;
   END IF;
@@ -76,12 +122,113 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_items' AND column_name = 'new_bin') THEN
     ALTER TABLE public.cc_items ADD COLUMN new_bin TEXT;
   END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_items' AND column_name = 'updated_at') THEN
+    ALTER TABLE public.cc_items ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+
+  -- Ensure timestamps on cc_users
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_users' AND column_name = 'created_at') THEN
+    ALTER TABLE public.cc_users ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cc_users' AND column_name = 'updated_at') THEN
+    ALTER TABLE public.cc_users ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
 END $$;
 
--- 5. Row Level Security (RLS) - Safe Policy Recreation
+-- ==============================================================================
+-- 3. HIGH-PERFORMANCE QUERY INDEXES
+-- ==============================================================================
+CREATE INDEX IF NOT EXISTS idx_cc_items_schedule ON public.cc_items(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_cc_items_bin ON public.cc_items(bin);
+CREATE INDEX IF NOT EXISTS idx_cc_items_mat_num ON public.cc_items(material_number);
+CREATE INDEX IF NOT EXISTS idx_cc_items_batch_sap ON public.cc_items(batch_sap);
+CREATE INDEX IF NOT EXISTS idx_cc_items_batch_fisik ON public.cc_items(batch_fisik);
+CREATE INDEX IF NOT EXISTS idx_cc_items_status ON public.cc_items(status);
+CREATE INDEX IF NOT EXISTS idx_cc_items_misplaced ON public.cc_items(is_misplaced) WHERE is_misplaced = TRUE;
+CREATE INDEX IF NOT EXISTS idx_cc_audit_logs_action ON public.cc_audit_logs(action_type);
+CREATE INDEX IF NOT EXISTS idx_cc_audit_logs_created ON public.cc_audit_logs(created_at DESC);
+
+-- ==============================================================================
+-- 4. AUTOMATED TIMESTAMP TRIGGER FUNCTIONS
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.set_current_timestamp_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+  -- Trigger on cc_items
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_set_updated_at_cc_items') THEN
+    CREATE TRIGGER trg_set_updated_at_cc_items
+    BEFORE UPDATE ON public.cc_items
+    FOR EACH ROW EXECUTE FUNCTION public.set_current_timestamp_updated_at();
+  END IF;
+
+  -- Trigger on cc_schedules
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_set_updated_at_cc_schedules') THEN
+    CREATE TRIGGER trg_set_updated_at_cc_schedules
+    BEFORE UPDATE ON public.cc_schedules
+    FOR EACH ROW EXECUTE FUNCTION public.set_current_timestamp_updated_at();
+  END IF;
+
+  -- Trigger on cc_settings
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_set_updated_at_cc_settings') THEN
+    CREATE TRIGGER trg_set_updated_at_cc_settings
+    BEFORE UPDATE ON public.cc_settings
+    FOR EACH ROW EXECUTE FUNCTION public.set_current_timestamp_updated_at();
+  END IF;
+END $$;
+
+-- ==============================================================================
+-- 5. RECONCILIATION ANALYTICS VIEW
+-- ==============================================================================
+CREATE OR REPLACE VIEW public.v_cc_reconciliation AS
+SELECT
+  i.id,
+  i.schedule_id,
+  i.no,
+  i.bin,
+  i.material_number,
+  i.material_desc,
+  i.batch_sap,
+  i.batch_fisik,
+  i.exp_date,
+  i.uom,
+  i.qty_sap,
+  i.picking_qty,
+  GREATEST(0, (i.qty_sap - i.picking_qty)) AS target_net,
+  i.actual_qty,
+  CASE
+    WHEN i.actual_qty IS NOT NULL THEN (i.actual_qty - GREATEST(0, (i.qty_sap - i.picking_qty)))
+    ELSE NULL
+  END AS variance,
+  CASE
+    WHEN i.actual_qty IS NULL THEN 'PENDING'
+    WHEN ABS(i.actual_qty - GREATEST(0, (i.qty_sap - i.picking_qty))) < 0.001 THEN 'MATCHED'
+    ELSE 'DISCREPANCY'
+  END AS calc_status,
+  i.is_misplaced,
+  i.new_bin,
+  i.note,
+  i.counted_by,
+  i.counted_at,
+  i.updated_at
+FROM public.cc_items i;
+
+-- ==============================================================================
+-- 6. ROW LEVEL SECURITY (RLS) POLICIES
+-- ==============================================================================
 ALTER TABLE public.cc_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cc_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cc_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cc_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cc_audit_logs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow public read/write on cc_schedules" ON public.cc_schedules;
 CREATE POLICY "Allow public read/write on cc_schedules" ON public.cc_schedules FOR ALL USING (true) WITH CHECK (true);
@@ -92,7 +239,15 @@ CREATE POLICY "Allow public read/write on cc_items" ON public.cc_items FOR ALL U
 DROP POLICY IF EXISTS "Allow public read/write on cc_users" ON public.cc_users;
 CREATE POLICY "Allow public read/write on cc_users" ON public.cc_users FOR ALL USING (true) WITH CHECK (true);
 
--- 6. Enable Realtime Safely (Checks publication first)
+DROP POLICY IF EXISTS "Allow public read/write on cc_settings" ON public.cc_settings;
+CREATE POLICY "Allow public read/write on cc_settings" ON public.cc_settings FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public read/write on cc_audit_logs" ON public.cc_audit_logs;
+CREATE POLICY "Allow public read/write on cc_audit_logs" ON public.cc_audit_logs FOR ALL USING (true) WITH CHECK (true);
+
+-- ==============================================================================
+-- 7. REALTIME REPLICATION PUBLICATION SETUP
+-- ==============================================================================
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -106,9 +261,58 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_schedules;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'cc_settings'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_settings;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'cc_audit_logs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cc_audit_logs;
+  END IF;
 END $$;
 
--- 7. Seed Initial Users (DO NOTHING on conflict -> Never overwrites active users)
+-- ==============================================================================
+-- 8. SEED DATA (DO NOTHING ON CONFLICT -> ZERO OVERWRITE OF LIVE USER DATA)
+-- ==============================================================================
+
+-- 8.1 Seed Default Settings
+INSERT INTO public.cc_settings (
+  id,
+  company_name,
+  division_name,
+  department_name,
+  doc_number_format,
+  ira_target_percent,
+  sig_checker_name,
+  sig_checker_position,
+  sig_spv_name,
+  sig_spv_position,
+  sig_controller_name,
+  sig_controller_position,
+  sig_accounting_name,
+  sig_accounting_position
+) VALUES (
+  'default_settings',
+  'PT INDUSTRI PANGAN NUSANTARA',
+  'Warehouse & Supply Chain Division',
+  'RMPM Department',
+  'BA-CC-RMPM/2026/09/21-01',
+  98.0,
+  'BUDI SANTOSO',
+  'Petugas Cycle Count',
+  'ASEP SAEPULLAH',
+  'Supervisor Warehouse',
+  'HENDRA WIJAYA',
+  'Inventory Controller',
+  'SITI RAHAYU, SE.',
+  'Cost & Inventory Accounting'
+) ON CONFLICT (id) DO NOTHING;
+
+-- 8.2 Seed Initial Users
 INSERT INTO public.cc_users (id, username, role, name, title, badge) VALUES
   ('admin_asep', 'spv_asep', 'ADMIN', 'Asep Saepullah', 'SPV Warehouse RMPM', 'Administrator / SPV'),
   ('checker_budi', 'checker_budi', 'CHECKER', 'Budi Santoso', 'Field Checker RMPM', 'Cycle Count Team A'),
@@ -116,12 +320,12 @@ INSERT INTO public.cc_users (id, username, role, name, title, badge) VALUES
   ('acc_siti', 'acc_siti', 'AUDITOR', 'Siti Rahayu, SE.', 'Cost & Inventory Accounting', 'Accounting & Audit')
 ON CONFLICT (id) DO NOTHING;
 
--- 8. Seed Initial Active Schedule (DO NOTHING on conflict -> Never overwrites active schedule)
+-- 8.3 Seed Initial Active Schedule
 INSERT INTO public.cc_schedules (id, doc_no, schedule_date, spv_name, area_name, target_category) VALUES
   ('sched-2026-09-21-01', 'BA-CC-RMPM/2026/09/21-01', '2026-09-21', 'SPV ASEP', 'RMPM Warehouse - Zone B (B.01 & B.02)', 'Raw Material & Packaging Material')
 ON CONFLICT (id) DO NOTHING;
 
--- 9. Seed 20 Initial Items (DO NOTHING on conflict -> Never overwrites live counted records!)
+-- 8.4 Seed 20 Initial Items
 INSERT INTO public.cc_items (id, schedule_id, no, bin, material_number, batch_sap, batch_fisik, exp_date, material_desc, uom, qty_sap, picking_qty, actual_qty, unit_conversion, note, is_misplaced, new_bin, status, counted_by) VALUES
   ('item-1', 'sched-2026-09-21-01', 1, 'B.01B.2.01', '40000210', '4000079065', '25391003-PALSGA', '22-Sep-27', 'MONO & DI GLYCERIDE (DMG 0097)', 'KG', 500.0, 0.0, 380.0, '10 Sak KG', 'Fisik 380 KG (10 Sak KG)', false, '', 'COUNTED', 'Budi Santoso'),
   ('item-2', 'sched-2026-09-21-01', 2, 'B.01A.5.01', '40000210', '4000079065', '25391003-PALSGA', '22-Sep-27', 'MONO & DI GLYCERIDE (DMG 0097)', 'KG', 200.0, 60.0, 180.0, 'FL-2', 'Ada proses picking FL-2', false, '', 'COUNTED', 'Budi Santoso'),

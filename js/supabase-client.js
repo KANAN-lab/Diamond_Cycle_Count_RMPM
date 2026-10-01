@@ -129,6 +129,66 @@ class SupabaseService {
     }
   }
 
+  // Save / update system settings to Supabase
+  async syncSettings(sigMatrix, companyProfile, updatedBy = 'ADMIN') {
+    if (!this.isConnected || !this.client) return;
+
+    try {
+      const payload = {
+        id: 'default_settings',
+        company_name: companyProfile.companyName,
+        division_name: companyProfile.divisionName,
+        department_name: companyProfile.departmentName,
+        doc_number_format: companyProfile.docNumber,
+        ira_target_percent: companyProfile.iraTargetPercent,
+        sig_checker_name: sigMatrix.checker.name,
+        sig_checker_position: sigMatrix.checker.position,
+        sig_spv_name: sigMatrix.supervisor.name,
+        sig_spv_position: sigMatrix.supervisor.position,
+        sig_controller_name: sigMatrix.controller.name,
+        sig_controller_position: sigMatrix.controller.position,
+        sig_accounting_name: sigMatrix.accounting.name,
+        sig_accounting_position: sigMatrix.accounting.position,
+        updated_by: updatedBy,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await this.client
+        .from('cc_settings')
+        .upsert(payload, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('[Supabase] Sync settings failed:', error);
+      } else {
+        console.log('[Supabase] Settings synced successfully');
+      }
+    } catch (err) {
+      console.warn('[Supabase] Error syncing settings:', err);
+    }
+  }
+
+  // Record activity to audit log
+  async recordAudit(actionType, performedBy, role, details = {}) {
+    if (!this.isConnected || !this.client) return;
+
+    try {
+      const { error } = await this.client
+        .from('cc_audit_logs')
+        .insert({
+          action_type: actionType,
+          performed_by: performedBy,
+          role: role,
+          details: details
+        });
+
+      if (error) {
+        console.warn('[Supabase] Audit log failed:', error);
+      }
+    } catch (err) {
+      console.warn('[Supabase] Error logging audit:', err);
+    }
+  }
+
   // Subscribe to real-time updates across devices (checker <-> admin)
   subscribeToChanges(onItemChange) {
     if (!this.isConnected || !this.client) return null;

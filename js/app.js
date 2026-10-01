@@ -4,6 +4,10 @@
 // Zero Hardcode: All signature matrix & company profiles customizable by Admin
 // ==============================================================================
 
+const STORAGE_KEYS = {
+  THEME: 'rmpm_theme'
+};
+
 class CycleCountApp {
   constructor() {
     // 1. Initialize OOP Domain Repositories & Auth

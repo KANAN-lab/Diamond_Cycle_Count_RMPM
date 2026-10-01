@@ -19,6 +19,10 @@ const server = http.createServer((req, res) => {
   let reqPath = decodeURI(req.url.split('?')[0]);
   if (reqPath === '/') {
     reqPath = '/index.html';
+  } else if (reqPath === '/favicon.ico') {
+    res.writeHead(204, { 'Cache-Control': 'max-age=86400' });
+    res.end();
+    return;
   }
 
   const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
