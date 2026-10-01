@@ -1,56 +1,115 @@
 /* ==========================================================================
-   RMPM Cycle Count System - Supabase Studio UI Clone & Design System
-   Engineered with authentic Supabase Studio tokens, spacious grid,
-   generous padding, robust mobile responsiveness, and audit-ready print view.
+   RMPM Cycle Count System - Unified Navbar & Dual Theme System
+   Default: LIGHT THEME. Supported: DARK THEME.
+   Strict Readability Guarantee: All text is high-contrast, never dark-on-dark.
    ========================================================================== */
 
-:root {
-  /* Supabase Studio Dark Theme Palette */
-  --sb-canvas: #121212;
-  --sb-surface: #181818;
-  --sb-surface-2: #1e1e1e;
-  --sb-surface-3: #242424;
-  --sb-surface-hover: #292929;
+/* 1. LIGHT THEME (DEFAULT) */
+:root, [data-theme="light"] {
+  --app-bg: #f8fafc;
+  --surface-main: #ffffff;
+  --surface-subtle: #f1f5f9;
+  --surface-hover: #f1f5f9;
+  --surface-elevated: #ffffff;
 
-  --sb-border: #2e2e2e;
-  --sb-border-light: #383838;
-  --sb-border-subtle: #242424;
+  --border-main: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-subtle: #f1f5f9;
 
-  --sb-brand: #3ecf8e;
-  --sb-brand-hover: #34b27b;
-  --sb-brand-surface: rgba(62, 207, 142, 0.12);
-  --sb-brand-border: rgba(62, 207, 142, 0.35);
+  --text-main: #0f172a;       /* Dark slate - 100% crisp & readable */
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
 
-  --sb-text-high: #f4f4f5;
-  --sb-text-med: #a1a1aa;
-  --sb-text-low: #71717a;
-  --sb-text-disabled: #52525b;
+  --brand-primary: #10b981;   /* Supabase emerald */
+  --brand-hover: #059669;
+  --brand-surface: rgba(16, 185, 129, 0.1);
+  --brand-border: rgba(16, 185, 129, 0.35);
 
-  --sb-danger: #f43f5e;
-  --sb-danger-surface: rgba(244, 63, 94, 0.12);
-  --sb-danger-border: rgba(244, 63, 94, 0.35);
+  --status-match: #16a34a;
+  --status-match-bg: #dcfce7;
+  --status-match-border: #86efac;
+  --status-match-text: #14532d;
 
-  --sb-warning: #f59e0b;
-  --sb-warning-surface: rgba(245, 158, 11, 0.12);
-  --sb-warning-border: rgba(245, 158, 11, 0.35);
+  --status-diff: #dc2626;
+  --status-diff-bg: #fee2e2;
+  --status-diff-border: #fca5a5;
+  --status-diff-text: #7f1d1d;
 
-  --sb-info: #38bdf8;
-  --sb-info-surface: rgba(56, 189, 248, 0.12);
-  --sb-info-border: rgba(56, 189, 248, 0.35);
+  --status-pending: #d97706;
+  --status-pending-bg: #fef3c7;
+  --status-pending-border: #fde68a;
+  --status-pending-text: #78350f;
 
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --status-reloc: #2563eb;
+  --status-reloc-bg: #dbeafe;
+  --status-reloc-border: #bfdbfe;
+  --status-reloc-text: #1e3a8a;
 
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-
-  --shadow-dropdown: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --nav-bg: #ffffff;
+  --nav-border: #e2e8f0;
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08);
 }
 
-/* Base Reset */
+/* 2. DARK THEME (HIGH CONTRAST OBSIDIAN STUDIO) */
+[data-theme="dark"] {
+  --app-bg: #121212;
+  --surface-main: #181818;
+  --surface-subtle: #1e1e1e;
+  --surface-hover: #262626;
+  --surface-elevated: #202020;
+
+  --border-main: #2e2e2e;
+  --border-strong: #383838;
+  --border-subtle: #242424;
+
+  --text-main: #f8fafc;       /* Crisp bright white - NEVER dark on dark! */
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+
+  --brand-primary: #3ecf8e;   /* Supabase neon emerald */
+  --brand-hover: #34b27b;
+  --brand-surface: rgba(62, 207, 142, 0.15);
+  --brand-border: rgba(62, 207, 142, 0.4);
+
+  --status-match: #4ade80;
+  --status-match-bg: rgba(74, 222, 128, 0.12);
+  --status-match-border: rgba(74, 222, 128, 0.35);
+  --status-match-text: #4ade80;
+
+  --status-diff: #f87171;
+  --status-diff-bg: rgba(248, 113, 113, 0.12);
+  --status-diff-border: rgba(248, 113, 113, 0.35);
+  --status-diff-text: #f87171;
+
+  --status-pending: #fbbf24;
+  --status-pending-bg: rgba(251, 191, 36, 0.12);
+  --status-pending-border: rgba(251, 191, 36, 0.35);
+  --status-pending-text: #fbbf24;
+
+  --status-reloc: #60a5fa;
+  --status-reloc-bg: rgba(96, 165, 250, 0.12);
+  --status-reloc-border: rgba(96, 165, 250, 0.35);
+  --status-reloc-text: #60a5fa;
+
+  --nav-bg: #181818;
+  --nav-border: #2e2e2e;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+/* Base Typography & Fonts */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -60,125 +119,179 @@
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--sb-canvas);
-  color: var(--sb-text-high);
+  background-color: var(--app-bg);
+  color: var(--text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
   padding-bottom: 70px; /* Room for mobile nav bar */
+  transition: background-color 0.2s, color 0.2s;
 }
 
 /* ==========================================================================
-   1. SUPABASE STUDIO TOP HEADER BAR
+   1. UNIFIED NAVBAR (Single Sleek Top Bar with Navigation & Actions)
    ========================================================================== */
-.sb-header {
-  background-color: var(--sb-surface);
-  border-bottom: 1px solid var(--sb-border);
+.main-navbar {
+  background-color: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: 0 1.25rem;
-  height: 56px;
-  display: flex;
-  align-items: center;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
-.sb-header-inner {
-  width: 100%;
+.navbar-inner {
   max-width: 1440px;
   margin: 0 auto;
+  padding: 0 1.25rem;
+  height: 60px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
 }
 
-.sb-brand-group {
+.navbar-brand-group {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  text-decoration: none;
+  color: var(--text-main);
 }
 
-.sb-logo-box {
-  width: 30px;
-  height: 30px;
-  background: var(--sb-brand-surface);
-  border: 1px solid var(--sb-brand-border);
+.brand-icon-box {
+  width: 32px;
+  height: 32px;
+  background-color: var(--brand-surface);
+  border: 1px solid var(--brand-border);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--sb-brand);
+  color: var(--brand-primary);
   font-weight: 900;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
-.sb-breadcrumb {
+.brand-text {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.brand-subtext {
+  display: none;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Navbar Navigation Links (Desktop) */
+.navbar-nav-links {
+  display: none; /* Hidden on small screens, visible >= 860px */
+  align-items: center;
+  gap: 0.5rem;
+  height: 100%;
+}
+
+.nav-link-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 0.85rem;
+  height: 60px;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
 }
 
-.sb-bc-org {
-  color: var(--sb-text-med);
-  font-weight: 500;
+.nav-link-btn:hover {
+  color: var(--text-main);
+  background-color: var(--surface-subtle);
 }
 
-.sb-bc-divider {
-  color: var(--sb-text-disabled);
-}
-
-.sb-bc-proj {
-  color: var(--sb-text-high);
+.nav-link-btn.active {
+  color: var(--brand-primary);
+  border-bottom-color: var(--brand-primary);
   font-weight: 700;
 }
 
-.sb-header-actions {
+/* Navbar Right Controls */
+.navbar-controls {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.5rem;
 }
 
-.sb-pill-btn {
-  background-color: var(--sb-surface-2);
-  border: 1px solid var(--sb-border);
-  color: var(--sb-text-med);
+.theme-toggle-btn {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
+  color: var(--text-main);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--border-strong);
+  background-color: var(--surface-hover);
+}
+
+.pill-status-btn {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.35rem 0.75rem;
+  padding: 0 0.65rem;
+  height: 36px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;
   transition: all 0.15s;
-  height: 34px;
 }
 
-.sb-pill-btn:hover {
-  background-color: var(--sb-surface-3);
-  color: var(--sb-text-high);
-  border-color: var(--sb-border-light);
+.pill-status-btn:hover {
+  border-color: var(--border-strong);
 }
 
-.sb-user-chip {
-  background-color: var(--sb-surface-2);
-  border: 1px solid var(--sb-border);
-  padding: 0.25rem 0.65rem 0.25rem 0.35rem;
+.user-account-chip {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
+  padding: 0 0.6rem 0 0.35rem;
+  height: 36px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   cursor: pointer;
-  height: 34px;
+  transition: all 0.15s;
 }
 
-.sb-user-avatar {
-  width: 24px;
-  height: 24px;
+.user-account-chip:hover {
+  border-color: var(--border-strong);
+}
+
+.user-chip-avatar {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--sb-brand);
+  background: var(--brand-primary);
   color: #121212;
   font-weight: 800;
   font-size: 0.75rem;
@@ -187,88 +300,34 @@ body {
   justify-content: center;
 }
 
-.sb-user-name {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--sb-text-high);
-}
-
-.sb-user-role {
-  font-size: 0.65rem;
-  color: var(--sb-brand);
-  text-transform: uppercase;
+.user-chip-name {
+  font-size: 0.78rem;
   font-weight: 700;
-}
-
-/* ==========================================================================
-   2. SUPABASE STUDIO SUB-NAVIGATION TABS
-   ========================================================================== */
-.sb-subnav {
-  background-color: var(--sb-surface);
-  border-bottom: 1px solid var(--sb-border);
-  padding: 0 1.25rem;
-  position: sticky;
-  top: 56px;
-  z-index: 90;
-}
-
-.sb-subnav-inner {
-  max-width: 1440px;
-  margin: 0 auto;
-  display: flex;
-  gap: 1.5rem;
-  overflow-x: auto;
-}
-
-.sb-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--sb-text-med);
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.75rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
+  color: var(--text-main);
+  line-height: 1.1;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  transition: all 0.15s;
 }
 
-.sb-tab:hover {
-  color: var(--sb-text-high);
-}
-
-.sb-tab.active {
-  color: var(--sb-brand);
-  border-bottom-color: var(--sb-brand);
-}
-
-.sb-tab-badge {
-  background: var(--sb-surface-3);
-  color: var(--sb-text-med);
-  font-size: 0.7rem;
+.user-chip-role {
+  font-size: 0.65rem;
+  color: var(--brand-primary);
   font-weight: 700;
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-xs);
-}
-
-.sb-tab.active .sb-tab-badge {
-  background: var(--sb-brand-surface);
-  color: var(--sb-brand);
+  text-transform: uppercase;
 }
 
 /* ==========================================================================
-   3. MAIN CONTENT CONTAINER (Spacious, Zero-Cramp)
+   2. MAIN CONTENT AREA (Spacious, Well-Spaced Layout)
    ========================================================================== */
-.sb-content {
+.app-container {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 1.75rem 1.25rem;
+  padding: 1.5rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem; /* Generous breathing room between sections */
+  gap: 1.5rem;
 }
 
 .view-section {
@@ -280,85 +339,80 @@ body {
 }
 
 /* ==========================================================================
-   4. STAT / KPI CARDS (Minimalist Supabase Studio Design)
+   3. STAT / KPI CARDS (Generous Padding & Crisp Contrast)
    ========================================================================== */
-.sb-kpi-grid {
+.kpi-deck {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.25rem; /* Spacious gap between cards */
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.25rem;
   margin-bottom: 0.5rem;
 }
 
-.sb-stat-card {
-  background-color: var(--sb-surface);
-  border: 1px solid var(--sb-border);
+.kpi-tile {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-md);
-  padding: 1.25rem 1.5rem; /* Generous internal padding */
+  padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  transition: border-color 0.15s;
+  gap: 0.45rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s;
 }
 
-.sb-stat-card:hover {
-  border-color: var(--sb-border-light);
+.kpi-tile:hover {
+  border-color: var(--border-strong);
 }
 
-.sb-stat-label {
+.kpi-tile-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--sb-text-med);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.sb-stat-value-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.sb-stat-number {
+.kpi-tile-number {
   font-size: 2rem;
   font-weight: 800;
-  font-family: var(--font-sans);
-  color: var(--sb-text-high);
+  color: var(--text-main);
   line-height: 1.1;
 }
 
-.sb-stat-meta {
+.kpi-tile-meta {
   font-size: 0.78rem;
-  color: var(--sb-text-low);
+  color: var(--text-secondary);
 }
 
-.sb-stat-card.brand-glow {
-  border-left: 3px solid var(--sb-brand);
+.kpi-tile.glow-brand {
+  border-left: 4px solid var(--brand-primary);
 }
 
-.sb-stat-card.danger-glow {
-  border-left: 3px solid var(--sb-danger);
+.kpi-tile.glow-danger {
+  border-left: 4px solid var(--status-diff);
 }
 
-.sb-stat-card.info-glow {
-  border-left: 3px solid var(--sb-info);
+.kpi-tile.glow-info {
+  border-left: 4px solid var(--status-reloc);
 }
 
 /* ==========================================================================
-   5. TABLE TOOLBAR (Search, Filters & Actions)
+   4. DATA TABLE TOOLBAR (Spacious Action Bar)
    ========================================================================== */
-.sb-toolbar {
-  background-color: var(--sb-surface);
-  border: 1px solid var(--sb-border);
+.table-toolbar {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-md);
   padding: 0.85rem 1rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.85rem;
   align-items: center;
   justify-content: space-between;
+  gap: 0.85rem;
+  box-shadow: var(--shadow-sm);
 }
 
-.sb-toolbar-left {
+.toolbar-search-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -366,60 +420,52 @@ body {
   flex: 1;
 }
 
-.sb-toolbar-right {
+.toolbar-action-group {
   display: flex;
   align-items: center;
   gap: 0.65rem;
 }
 
-.sb-search-box {
-  position: relative;
-  min-width: 280px;
-  max-width: 400px;
-  flex: 1;
-}
-
-.sb-input {
-  width: 100%;
+.app-input {
   height: 38px;
-  background-color: var(--sb-canvas);
-  border: 1px solid var(--sb-border);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-sm);
-  color: var(--sb-text-high);
+  color: var(--text-main);
   padding: 0 0.85rem;
   font-size: 0.85rem;
   outline: none;
   transition: all 0.15s;
 }
 
-.sb-input:focus {
-  border-color: var(--sb-brand);
-  box-shadow: 0 0 0 2px var(--sb-brand-surface);
+.app-input:focus {
+  border-color: var(--brand-primary);
+  background-color: var(--surface-main);
 }
 
-.sb-select {
+.app-select {
   height: 38px;
-  background-color: var(--sb-canvas);
-  border: 1px solid var(--sb-border);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-sm);
-  color: var(--sb-text-high);
+  color: var(--text-main);
   padding: 0 0.85rem;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   outline: none;
   cursor: pointer;
 }
 
-.sb-select:focus {
-  border-color: var(--sb-brand);
+.app-select:focus {
+  border-color: var(--brand-primary);
 }
 
-/* Supabase Studio Buttons */
-.sb-btn {
+/* Action Buttons */
+.btn-core {
   height: 38px;
   padding: 0 0.95rem;
   font-size: 0.82rem;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
@@ -431,91 +477,81 @@ body {
   white-space: nowrap;
 }
 
-.sb-btn-primary {
-  background-color: var(--sb-brand);
+.btn-primary {
+  background-color: var(--brand-primary);
   color: #121212;
-  font-weight: 700;
 }
 
-.sb-btn-primary:hover {
-  background-color: var(--sb-brand-hover);
+.btn-primary:hover {
+  background-color: var(--brand-hover);
 }
 
-.sb-btn-secondary {
-  background-color: var(--sb-surface-2);
-  border-color: var(--sb-border);
-  color: var(--sb-text-high);
+.btn-secondary {
+  background-color: var(--surface-subtle);
+  border-color: var(--border-main);
+  color: var(--text-main);
 }
 
-.sb-btn-secondary:hover {
-  background-color: var(--sb-surface-3);
-  border-color: var(--sb-border-light);
+.btn-secondary:hover {
+  background-color: var(--surface-hover);
+  border-color: var(--border-strong);
 }
 
-.sb-btn-sm {
-  height: 30px;
+.btn-sm {
+  height: 32px;
   padding: 0 0.65rem;
   font-size: 0.75rem;
 }
 
 /* ==========================================================================
-   6. SUPABASE TABLE EDITOR (Spacious, High-Density & Un-Cramped)
+   5. MASTER TABLE GRID (High-Density, Spacious & Perfectly Readable)
    ========================================================================== */
-.sb-table-container {
-  background-color: var(--sb-surface);
-  border: 1px solid var(--sb-border);
+.table-wrapper {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-md);
   overflow-x: auto;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
-.sb-table {
+.grid-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
   text-align: left;
 }
 
-.sb-table th {
-  background-color: #181818;
-  color: var(--sb-text-med);
+.grid-table th {
+  background-color: var(--surface-subtle);
+  color: var(--text-muted);
   font-weight: 700;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 0.85rem 1rem; /* Spacious padding */
-  border-bottom: 1px solid var(--sb-border);
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-main);
   white-space: nowrap;
 }
 
-.sb-table td {
-  padding: 0.85rem 1rem; /* Spacious cell padding - no cramping! */
-  border-bottom: 1px solid var(--sb-border-subtle);
-  color: var(--sb-text-high);
+.grid-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-main);
   vertical-align: middle;
 }
 
-.sb-table tbody tr {
-  transition: background-color 0.15s;
+.grid-table tbody tr:hover {
+  background-color: var(--surface-hover);
 }
 
-.sb-table tbody tr:hover {
-  background-color: var(--sb-surface-hover);
+.grid-table tbody tr.row-discrepancy {
+  background-color: var(--status-diff-bg);
 }
 
-.sb-table tbody tr.row-diff {
-  background-color: rgba(244, 63, 94, 0.05);
+.grid-table tbody tr.row-relocated {
+  background-color: var(--status-reloc-bg);
 }
 
-.sb-table tbody tr.row-diff:hover {
-  background-color: rgba(244, 63, 94, 0.1);
-}
-
-.sb-table tbody tr.row-reloc {
-  background-color: rgba(56, 189, 248, 0.05);
-}
-
-/* Monospace & Number Alignment */
 .font-mono {
   font-family: var(--font-mono);
   font-size: 0.82rem;
@@ -527,11 +563,11 @@ body {
   font-size: 0.85rem;
 }
 
-/* Status Badges */
-.sb-badge {
+/* Badges */
+.app-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
   padding: 0.25rem 0.6rem;
   font-size: 0.72rem;
   font-weight: 700;
@@ -541,66 +577,67 @@ body {
   white-space: nowrap;
 }
 
-.sb-badge-match {
-  background: var(--sb-brand-surface);
-  color: var(--sb-brand);
-  border: 1px solid var(--sb-brand-border);
+.badge-match {
+  background: var(--status-match-bg);
+  color: var(--status-match-text);
+  border: 1px solid var(--status-match-border);
 }
 
-.sb-badge-diff {
-  background: var(--sb-danger-surface);
-  color: var(--sb-danger);
-  border: 1px solid var(--sb-danger-border);
+.badge-diff {
+  background: var(--status-diff-bg);
+  color: var(--status-diff-text);
+  border: 1px solid var(--status-diff-border);
 }
 
-.sb-badge-pending {
-  background: var(--sb-warning-surface);
-  color: var(--sb-warning);
-  border: 1px solid var(--sb-warning-border);
+.badge-pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+  border: 1px solid var(--status-pending-border);
 }
 
-.sb-badge-reloc {
-  background: var(--sb-info-surface);
-  color: var(--sb-info);
-  border: 1px solid var(--sb-info-border);
+.badge-reloc {
+  background: var(--status-reloc-bg);
+  color: var(--status-reloc-text);
+  border: 1px solid var(--status-reloc-border);
 }
 
-.sb-badge-bin {
-  background: var(--sb-surface-3);
-  color: #fff;
-  border: 1px solid var(--sb-border-light);
+.badge-bin {
+  background: var(--surface-subtle);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.8rem;
   padding: 0.25rem 0.55rem;
   border-radius: var(--radius-xs);
 }
 
 /* ==========================================================================
-   7. MOBILE LOCATION STRIP & CHECKER WALKTHROUGH
+   6. CHECKER MODE (Mobile-First Handheld Stepper)
    ========================================================================== */
-.sb-loc-bar {
-  background-color: var(--sb-surface);
-  border: 1px solid var(--sb-border);
+.location-stepper-box {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-md);
   padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  box-shadow: var(--shadow-sm);
 }
 
-.sb-bin-stepper {
+.bin-nav-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
 }
 
-.sb-bin-display {
+.bin-indicator {
   flex: 1;
   text-align: center;
-  background-color: var(--sb-canvas);
-  border: 1px solid var(--sb-brand-border);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--brand-border);
   border-radius: var(--radius-sm);
   padding: 0.5rem;
   min-height: 48px;
@@ -609,35 +646,28 @@ body {
   justify-content: center;
 }
 
-.sb-bin-active-code {
+.bin-title {
   font-family: var(--font-mono);
   font-size: 1.25rem;
   font-weight: 800;
-  color: var(--sb-brand);
-  letter-spacing: 0.05em;
+  color: var(--brand-primary);
   line-height: 1.1;
 }
 
-.sb-bin-meta-info {
-  font-size: 0.7rem;
-  color: var(--sb-text-med);
-  margin-top: 0.15rem;
-}
-
-/* Focus Walkthrough Card */
-.sb-focus-card {
-  background-color: var(--sb-surface);
-  border: 1px solid var(--sb-border);
+.focus-item-sheet {
+  background-color: var(--surface-main);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-md);
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  box-shadow: var(--shadow-sm);
 }
 
-.sb-focus-spec-box {
-  background-color: var(--sb-canvas);
-  border: 1px solid var(--sb-border);
+.focus-spec-grid {
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-main);
   border-radius: var(--radius-sm);
   padding: 0.85rem;
   display: grid;
@@ -645,23 +675,23 @@ body {
   gap: 0.75rem;
 }
 
-.sb-spec-cell span {
+.spec-item span {
   font-size: 0.7rem;
-  color: var(--sb-text-low);
+  color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 600;
   display: block;
 }
 
-.sb-spec-cell strong {
+.spec-item strong {
   font-family: var(--font-mono);
   font-size: 0.9rem;
-  color: var(--sb-text-high);
+  color: var(--text-main);
 }
 
-.sb-focus-target-bar {
-  background-color: var(--sb-surface-2);
-  border: 1px dashed var(--sb-border-light);
+.focus-target-grid {
+  background-color: var(--surface-subtle);
+  border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 1rem;
   display: flex;
@@ -669,22 +699,24 @@ body {
   align-items: center;
 }
 
-/* Mobile Bottom Navigation Bar */
-.sb-bottom-bar {
+/* ==========================================================================
+   7. MOBILE BOTTOM NAV (Hidden on >= 860px)
+   ========================================================================== */
+.mobile-bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   height: 60px;
-  background-color: var(--sb-surface);
-  border-top: 1px solid var(--sb-border);
+  background-color: var(--nav-bg);
+  border-top: 1px solid var(--nav-border);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 100;
 }
 
-.sb-bnav-item {
+.bnav-item {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -694,98 +726,100 @@ body {
   height: 100%;
   background: none;
   border: none;
-  color: var(--sb-text-low);
+  color: var(--text-muted);
   font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
 }
 
-.sb-bnav-item.active {
-  color: var(--sb-brand);
+.bnav-item.active {
+  color: var(--brand-primary);
   font-weight: 800;
 }
 
 /* ==========================================================================
-   8. MODAL / BOTTOM SHEET
+   8. MODALS (Responsive Bottom Sheet / Dialog)
    ========================================================================== */
-.sb-modal-overlay {
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: flex-end; /* Bottom sheet on mobile */
+  align-items: flex-end;
   justify-content: center;
   z-index: 1000;
 }
 
-.sb-modal-content {
-  background: var(--sb-surface);
-  border: 1px solid var(--sb-border);
+.modal-dialog {
+  background: var(--surface-main);
+  border: 1px solid var(--border-main);
   width: 100%;
   max-width: 520px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   max-height: 90dvh;
   overflow-y: auto;
-  box-shadow: var(--shadow-dropdown);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
 }
 
-.sb-modal-header {
+.modal-head {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--sb-border);
+  border-bottom: 1px solid var(--border-main);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.sb-modal-body {
+.modal-body {
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1.15rem;
 }
 
-.sb-modal-footer {
+.modal-foot {
   padding: 1rem 1.25rem;
-  border-top: 1px solid var(--sb-border);
+  border-top: 1px solid var(--border-main);
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  background-color: var(--sb-surface-2);
+  background-color: var(--surface-subtle);
 }
 
-/* ==========================================================================
-   9. DESKTOP ADAPTATION (>= 768px)
-   ========================================================================== */
-@media (min-width: 768px) {
+/* Desktop Breakpoints */
+@media (min-width: 860px) {
   body {
-    padding-bottom: 2rem; /* No mobile nav bar on desktop */
+    padding-bottom: 2rem;
   }
 
-  .sb-bottom-bar {
+  .navbar-nav-links {
+    display: flex;
+  }
+
+  .brand-subtext {
+    display: block;
+  }
+
+  .mobile-bottom-nav {
     display: none !important;
   }
 
-  .sb-subnav {
-    display: block !important;
+  .modal-overlay {
+    align-items: center;
   }
 
-  .sb-modal-overlay {
-    align-items: center; /* Centered modal on desktop */
-  }
-
-  .sb-modal-content {
+  .modal-dialog {
     border-radius: var(--radius-md);
   }
 }
 
 /* ==========================================================================
-   10. A4 LANDSCAPE PRINT VIEW (CLEAN WHITE FOR OFFICIAL SIGN-OFF)
+   9. PRINT STYLES (A4 LANDSCAPE OFFICIAL SIGN-OFF)
    ========================================================================== */
 .print-document-sheet {
   background-color: #ffffff;
@@ -811,6 +845,7 @@ body {
   font-size: 14pt;
   font-weight: 800;
   text-transform: uppercase;
+  color: #000000;
 }
 
 .doc-title-main {
@@ -823,6 +858,7 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   text-decoration: underline;
+  color: #000000;
 }
 
 .doc-data-table {
@@ -867,6 +903,7 @@ body {
   flex-direction: column;
   justify-content: space-between;
   min-height: 130px;
+  color: #000000;
 }
 
 .sig-title {
@@ -891,13 +928,13 @@ body {
     color: #000000 !important;
     padding: 0 !important;
   }
-  .sb-header,
-  .sb-subnav,
-  .sb-bottom-bar,
-  .sb-toolbar,
-  .sb-modal-overlay,
-  .sb-btn,
-  .sb-kpi-grid {
+  .main-navbar,
+  .mobile-bottom-nav,
+  .table-toolbar,
+  .modal-overlay,
+  .btn-core,
+  .kpi-deck,
+  .location-stepper-box {
     display: none !important;
   }
   .view-section {

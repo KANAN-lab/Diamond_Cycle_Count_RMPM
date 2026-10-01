@@ -1,12 +1,14 @@
 // ==========================================================================
-// RMPM Cycle Count System - Mobile-First Industrial WMS Controller
-// Built for Handheld Scanners & Mobile Phones with Desktop Reflow
+// RMPM Cycle Count System - Unified Navbar & Dual Theme Controller
+// Built for Warehouse Floor Scanners & Desktop Reconciliation Dashboard
+// Default Theme: LIGHT THEME (Crisp, High-Contrast, Legible in Dark & Light)
 // ==========================================================================
 
 const STORAGE_KEYS = {
   ITEMS: 'rmpm_cc_items_v1',
   SCHEDULE: 'rmpm_cc_schedule_v1',
-  CURRENT_USER: 'rmpm_cc_user_v1'
+  CURRENT_USER: 'rmpm_cc_user_v1',
+  THEME: 'rmpm_theme'
 };
 
 class CycleCountApp {
@@ -15,13 +17,13 @@ class CycleCountApp {
     this.schedule = {};
     this.users = INITIAL_USERS;
     this.currentUser = null;
-    this.activeTab = 'view-checker'; // Default mobile view: Checker Count
+    this.activeTab = 'view-dashboard'; // Default desktop view: Table Editor
 
     // Mobile Location & Guided Walkthrough State
     this.uniqueBins = [];
     this.currentBinIndex = 0;
     this.currentItemIndexInBin = 0;
-    this.isFocusMode = true; // true: Guided single-item Zebra style, false: Card List
+    this.isFocusMode = true; // Guided single-item Zebra style
     this.activePackWeight = 25; // default 25 KG per Sak
 
     // Filters & Search
@@ -32,6 +34,7 @@ class CycleCountApp {
   }
 
   async init() {
+    this.initTheme();
     this.loadState();
     this.calculateUniqueBins();
     this.bindEvents();
@@ -41,12 +44,41 @@ class CycleCountApp {
     this.renderDashboard();
     this.renderPrintout();
 
-    // Supabase Real-time connection
+    // Default to checker view on small handheld screens
+    if (window.innerWidth <= 768) {
+      this.switchView('view-checker');
+    }
+
+    // Automatic Supabase Real-time connection
     if (window.supabaseService && window.supabaseService.isConnected) {
       await this.initSupabaseSync();
     }
   }
 
+  // ================= 1. THEME CONTROLLER (DEFAULT LIGHT, HIGH CONTRAST DARK) =================
+  initTheme() {
+    const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'light';
+    this.applyTheme(savedTheme);
+  }
+
+  toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    this.applyTheme(nextTheme);
+  }
+
+  applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
+
+    const icon = document.getElementById('theme-toggle-icon');
+    if (icon) {
+      // If current is dark, show sun (to switch to light); if light, show moon
+      icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+  }
+
+  // ================= 2. STATE PERSISTENCE =================
   loadState() {
     // Load Items
     const storedItems = localStorage.getItem(STORAGE_KEYS.ITEMS);
@@ -74,13 +106,13 @@ class CycleCountApp {
       this.saveSchedule();
     }
 
-    // Load Current User (Default: Checker Budi on mobile for fast count)
+    // Load Current User (Default: Supervisor Asep on desktop, Checker on mobile)
     const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (storedUser) {
       const found = this.users.find(u => u.id === storedUser);
-      this.currentUser = found || this.users[1];
+      this.currentUser = found || this.users[0];
     } else {
-      this.currentUser = this.users[1]; // Checker Budi Santoso
+      this.currentUser = window.innerWidth <= 768 ? this.users[1] : this.users[0];
     }
   }
 
@@ -96,10 +128,12 @@ class CycleCountApp {
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, this.currentUser.id);
   }
 
-  // ================= Unique BIN Calculations =================
+  // ================= 3. UNIQUE BIN CALCULATIONS =================
   calculateUniqueBins() {
     const set = new Set();
-    this.items.forEach(i => set.add(i.bin));
+    this.items.forEach(i => {
+      if (i.bin) set.add(i.bin);
+    });
     this.uniqueBins = Array.from(set);
     if (this.currentBinIndex >= this.uniqueBins.length) {
       this.currentBinIndex = 0;
@@ -115,17 +149,25 @@ class CycleCountApp {
     return this.items.filter(i => i.bin === currentBin);
   }
 
-  // ================= Event Listeners =================
+  // ================= 4. EVENT LISTENERS =================
   bindEvents() {
-    // Navigation Tabs (Supabase Studio Desktop Subnav & Mobile Bottom Bar)
-    document.querySelectorAll('.sb-tab, .sb-bnav-item').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const targetView = tab.getAttribute('data-target');
-        this.switchView(targetView);
+    // 1. Unified Top Navbar & Mobile Bottom Nav Buttons
+    document.querySelectorAll('.nav-link-btn, .bnav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetView = btn.getAttribute('data-target');
+        if (targetView) {
+          this.switchView(targetView);
+        }
       });
     });
 
-    // Dashboard Search & Filter Inputs
+    // 2. Theme Toggle Button
+    const themeBtn = document.getElementById('btn-theme-toggle');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => this.toggleTheme());
+    }
+
+    // 3. Dashboard Search & Filters
     const dashSearch = document.getElementById('dash-search-input');
     if (dashSearch) {
       dashSearch.addEventListener('input', () => this.renderDashboard());
@@ -139,7 +181,7 @@ class CycleCountApp {
       dashStatus.addEventListener('change', () => this.renderDashboard());
     }
 
-    // BIN Steppers (◀ / ▶)
+    // 4. BIN Steppers (◀ / ▶)
     document.getElementById('btn-prev-bin').addEventListener('click', () => {
       if (this.currentBinIndex > 0) {
         this.currentBinIndex--;
@@ -156,28 +198,26 @@ class CycleCountApp {
       }
     });
 
-    // Mode Toggle (🎯 Focus vs 📋 List)
+    // 5. Mode Toggle (🎯 Focus vs 📋 List)
     document.getElementById('btn-toggle-focus-mode').addEventListener('click', () => {
       this.isFocusMode = !this.isFocusMode;
       const btn = document.getElementById('btn-toggle-focus-mode');
       if (this.isFocusMode) {
         btn.textContent = '🎯 Mode Fokus';
-        btn.classList.add('active');
       } else {
         btn.textContent = '📋 Mode List';
-        btn.classList.remove('active');
       }
       this.renderActiveBinView();
     });
 
-    // Mobile Barcode & Search
+    // 6. Mobile Barcode & Search
     document.getElementById('mobile-barcode-search').addEventListener('input', (e) => {
       const q = e.target.value.trim().toLowerCase();
       this.searchQuery = q;
       this.handleSearchOrBarcode(q);
     });
 
-    // Focus Item Steppers (Item Prev / Item Next in same BIN)
+    // 7. Focus Item Steppers (Item Prev / Item Next in same BIN)
     document.getElementById('fc-prev-item').addEventListener('click', () => {
       if (this.currentItemIndexInBin > 0) {
         this.currentItemIndexInBin--;
@@ -193,7 +233,7 @@ class CycleCountApp {
       }
     });
 
-    // Focus Item 1-Tap Match Button
+    // 8. Focus Item Quick Match Button
     document.getElementById('fc-btn-match').addEventListener('click', () => {
       const binItems = this.getItemsInCurrentBin();
       const currentItem = binItems[this.currentItemIndexInBin];
@@ -202,7 +242,7 @@ class CycleCountApp {
       }
     });
 
-    // Focus Item Open Input & Packaging Calc
+    // 9. Focus Item Open Input & Packaging Calc
     document.getElementById('fc-btn-input-calc').addEventListener('click', () => {
       const binItems = this.getItemsInCurrentBin();
       const currentItem = binItems[this.currentItemIndexInBin];
@@ -211,7 +251,7 @@ class CycleCountApp {
       }
     });
 
-    // Focus Item Misplaced Quick Trigger
+    // 10. Focus Item Misplaced Quick Trigger
     document.getElementById('fc-btn-misplaced').addEventListener('click', () => {
       const binItems = this.getItemsInCurrentBin();
       const currentItem = binItems[this.currentItemIndexInBin];
@@ -220,29 +260,30 @@ class CycleCountApp {
       }
     });
 
-    // Modal Close
+    // 11. Modal Close Buttons
     document.querySelectorAll('[data-close]').forEach(btn => {
       btn.addEventListener('click', () => {
         const modalId = btn.getAttribute('data-close');
-        document.getElementById(modalId).style.display = 'none';
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
       });
     });
 
-    // User Switcher Modal
+    // 12. User Switcher Modal
     document.getElementById('btn-open-user-modal').addEventListener('click', () => {
       this.openUserModal();
     });
 
-    // Supabase Config Modal
+    // 13. Supabase Config Modal & Auto-Connect
     document.getElementById('btn-supabase-status').addEventListener('click', () => {
-      document.getElementById('cfg-supabase-url').value = localStorage.getItem('rmpm_supabase_url') || '';
+      document.getElementById('cfg-supabase-url').value = localStorage.getItem('rmpm_supabase_url') || APP_CONFIG.SUPABASE_URL || '';
       document.getElementById('modal-supabase-config').style.display = 'flex';
     });
 
     document.getElementById('btn-save-supabase-config').addEventListener('click', async () => {
       const urlInput = document.getElementById('cfg-supabase-url').value.trim();
       if (!urlInput) {
-        alert('Masukkan URL Supabase yang valid!');
+        alert('Masukkan URL Supabase yang valid (contoh: https://xxxxxxxx.supabase.co)');
         return;
       }
       if (window.supabaseService) {
@@ -251,18 +292,18 @@ class CycleCountApp {
         await this.initSupabaseSync();
       }
       document.getElementById('modal-supabase-config').style.display = 'none';
-      alert('Koneksi Supabase berhasil disimpan!');
+      alert('Koneksi Supabase berhasil disimpan! Realtime sync aktif.');
     });
 
-    // Packaging Converter Steppers in Modal
+    // 14. Packaging Converter Steppers in Modal
     this.bindPackagingModalEvents();
 
-    // Dashboard Buttons
+    // 15. Dashboard Action Buttons
     document.getElementById('btn-dash-export').addEventListener('click', () => this.exportCsv());
     document.getElementById('btn-dash-reset').addEventListener('click', () => this.resetDemoData());
     document.getElementById('btn-dash-print').addEventListener('click', () => this.switchView('view-printout'));
 
-    // Import SAP Button
+    // 16. Import SAP Button
     document.getElementById('btn-process-import').addEventListener('click', () => this.processSapImport());
   }
 
@@ -334,7 +375,7 @@ class CycleCountApp {
     }
   }
 
-  // ================= Barcode / Fast Search Handler =================
+  // ================= 5. BARCODE & SEARCH HANDLER =================
   handleSearchOrBarcode(query) {
     if (!query) {
       this.renderActiveBinView();
@@ -374,7 +415,7 @@ class CycleCountApp {
     this.renderActiveBinView();
   }
 
-  // ================= Navigation View Switcher =================
+  // ================= 6. NAVIGATION SWITCHER =================
   switchView(viewId) {
     this.activeTab = viewId;
 
@@ -383,12 +424,13 @@ class CycleCountApp {
       s.classList.toggle('active', s.id === viewId);
     });
 
-    // Supabase Subnav tabs (Desktop) & Mobile Bottom Nav items
-    document.querySelectorAll('.sb-tab').forEach(tab => {
+    // Update Desktop Navbar Links
+    document.querySelectorAll('.nav-link-btn').forEach(tab => {
       tab.classList.toggle('active', tab.getAttribute('data-target') === viewId);
     });
 
-    document.querySelectorAll('.sb-bnav-item').forEach(btn => {
+    // Update Mobile Bottom Nav
+    document.querySelectorAll('.bnav-item').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-target') === viewId);
     });
 
@@ -401,7 +443,7 @@ class CycleCountApp {
     }
   }
 
-  // ================= User & Cloud Status =================
+  // ================= 7. USER & CLOUD STATUS =================
   renderUserBar() {
     if (!this.currentUser) return;
     document.getElementById('user-avatar-initial').textContent = this.currentUser.name.charAt(0);
@@ -417,14 +459,14 @@ class CycleCountApp {
 
     if (window.supabaseService && window.supabaseService.isConnected) {
       dot.textContent = '🟢';
-      text.textContent = 'Online';
-      btn.style.borderColor = '#16a34a';
-      btn.style.background = '#052e16';
+      text.textContent = 'Cloud Sync';
+      btn.style.borderColor = 'var(--brand-primary)';
+      btn.style.color = 'var(--text-main)';
     } else {
-      dot.textContent = '🟡';
-      text.textContent = 'Setup';
-      btn.style.borderColor = '#0284c7';
-      btn.style.background = '#0c4a6e';
+      dot.textContent = '⚡';
+      text.textContent = 'Hubungkan DB';
+      btn.style.borderColor = 'var(--border-strong)';
+      btn.style.color = 'var(--text-muted)';
     }
   }
 
@@ -450,6 +492,7 @@ class CycleCountApp {
             this.items[idx].newBin = payload.new.new_bin || '';
             this.items[idx].status = payload.new.status || 'PENDING';
             this.items[idx].countedBy = payload.new.counted_by || '';
+            this.items[idx].countedAt = payload.new.counted_at || '';
             this.saveItems();
             this.renderActiveBinView();
             this.renderDashboard();
@@ -458,7 +501,7 @@ class CycleCountApp {
         }
       });
     } catch (e) {
-      console.warn('[Supabase Sync Error]', e);
+      console.warn('Supabase sync exception:', e);
     }
   }
 
@@ -467,27 +510,28 @@ class CycleCountApp {
     container.innerHTML = '';
 
     this.users.forEach(u => {
-      const isCurrent = u.id === this.currentUser.id;
+      const isCurrent = this.currentUser && this.currentUser.id === u.id;
       const card = document.createElement('div');
       card.style.cssText = `
-        border: 1px solid ${isCurrent ? 'var(--brand-blue)' : 'var(--border-light)'};
-        background-color: ${isCurrent ? '#f0f9ff' : '#ffffff'};
-        padding: 0.75rem;
+        background-color: var(--surface-subtle);
+        border: 1px solid ${isCurrent ? 'var(--brand-primary)' : 'var(--border-main)'};
         border-radius: var(--radius-sm);
+        padding: 0.75rem 1rem;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: space-between;
         margin-bottom: 0.5rem;
+        transition: all 0.15s;
       `;
 
       card.innerHTML = `
         <div>
-          <div style="font-weight: 800; font-size: 0.9rem;">${u.name}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">${u.title} &bull; <strong>${u.badge}</strong></div>
+          <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${u.name}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">${u.title} &bull; <strong style="color: var(--brand-primary);">${u.badge}</strong></div>
         </div>
         <div>
-          ${isCurrent ? '<span style="font-size: 0.75rem; color: var(--brand-blue); font-weight: 800;">AKTIF</span>' : '<button class="btn btn-secondary btn-sm">Pilih</button>'}
+          ${isCurrent ? '<span style="font-size: 0.75rem; color: var(--brand-primary); font-weight: 800;">AKTIF</span>' : '<button class="btn-core btn-secondary btn-sm">Pilih</button>'}
         </div>
       `;
 
@@ -510,7 +554,7 @@ class CycleCountApp {
     document.getElementById('modal-user-switcher').style.display = 'flex';
   }
 
-  // ================= 4. CHECKER ACTIVE BIN VIEW RENDERING =================
+  // ================= 8. CHECKER ACTIVE BIN VIEW RENDERING =================
   renderActiveBinView() {
     const currentBin = this.getCurrentBin();
     const binItems = this.getItemsInCurrentBin();
@@ -559,19 +603,18 @@ class CycleCountApp {
     document.getElementById('fc-exp-date').textContent = item.expDate;
     document.getElementById('fc-picking').textContent = `${item.pickingQty.toFixed(1)} ${item.uom}`;
     document.getElementById('fc-target-net').textContent = `${targetNet.toFixed(3)} ${item.uom}`;
-    document.getElementById('fc-sap-raw').textContent = item.qtySap.toFixed(2);
 
     // Status Badge
-    let badgeHtml = '<span class="badge badge-pending">BELUM HITUNG</span>';
+    let badgeHtml = '<span class="app-badge badge-pending">BELUM HITUNG</span>';
     if (isCounted) {
       if (isDiff) {
-        badgeHtml = '<span class="badge badge-discrepancy">⚠️ SELISIH</span>';
+        badgeHtml = '<span class="app-badge badge-diff">⚠️ SELISIH</span>';
       } else {
-        badgeHtml = '<span class="badge badge-matched">✅ COCOK</span>';
+        badgeHtml = '<span class="app-badge badge-match">✅ COCOK</span>';
       }
     }
     if (item.isMisplaced) {
-      badgeHtml += ` <span class="badge badge-misplaced">PINDAH: ${item.newBin}</span>`;
+      badgeHtml += ` <span class="app-badge badge-reloc">PINDAH: ${item.newBin}</span>`;
     }
     document.getElementById('fc-status-badge').innerHTML = badgeHtml;
 
@@ -581,9 +624,10 @@ class CycleCountApp {
       if (isDiff) {
         document.getElementById('fc-diff-val').textContent = `Selisih: ${(diff >= 0 ? '+' : '') + diff.toFixed(3)} ${item.uom}`;
         document.getElementById('fc-diff-val').style.display = 'block';
+        document.getElementById('fc-diff-val').style.color = 'var(--status-diff)';
       } else {
         document.getElementById('fc-diff-val').textContent = `Match (0.000 ${item.uom})`;
-        document.getElementById('fc-diff-val').style.color = 'var(--status-match)';
+        document.getElementById('fc-diff-val').style.color = 'var(--brand-primary)';
         document.getElementById('fc-diff-val').style.display = 'block';
       }
     } else {
@@ -622,40 +666,38 @@ class CycleCountApp {
       return;
     }
 
-    binItems.forEach((item, idx) => {
+    binItems.forEach((item) => {
       const targetNet = item.qtySap - (item.pickingQty || 0);
       const isCounted = item.actualQty !== null && item.actualQty !== undefined;
       const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
 
-      let cardClass = 'compact-card card-wait';
-      let badge = '<span class="badge badge-pending">BELUM</span>';
+      let badge = '<span class="app-badge badge-pending">BELUM</span>';
       if (isCounted) {
-        if (isDiff) {
-          cardClass = 'compact-card card-diff';
-          badge = '<span class="badge badge-discrepancy">SELISIH</span>';
-        } else {
-          cardClass = 'compact-card card-matched';
-          badge = '<span class="badge badge-matched">COCOK</span>';
-        }
+        badge = isDiff ? '<span class="app-badge badge-diff">SELISIH</span>' : '<span class="app-badge badge-match">COCOK</span>';
       }
 
       const card = document.createElement('div');
-      card.className = cardClass;
+      card.className = 'focus-item-sheet';
+      card.style.padding = '1rem';
       card.innerHTML = `
-        <div class="compact-card-header">
-          <div class="compact-card-title">${item.materialDesc}</div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+          <div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${item.materialDesc}</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Kode: <strong class="font-mono" style="color: var(--text-main);">${item.materialNumber}</strong> &bull; Batch: <strong class="font-mono" style="color: var(--brand-primary);">${item.batchFisik}</strong>
+            </div>
+          </div>
           <div>${badge}</div>
         </div>
-        <div class="compact-card-meta">
-          Kode: ${item.materialNumber} &bull; Batch Vendor: <strong style="color:var(--brand-blue);">${item.batchFisik}</strong>
+
+        <div style="display: flex; justify-content: space-between; background: var(--surface-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.82rem; margin: 0.5rem 0;">
+          <div>Target: <strong class="font-mono" style="color: var(--text-main);">${targetNet.toFixed(2)} ${item.uom}</strong></div>
+          <div>Fisik: <strong class="font-mono" style="color: var(--brand-primary);">${isCounted ? item.actualQty.toFixed(2) : '-'} ${item.uom}</strong></div>
         </div>
-        <div class="compact-card-body">
-          <div>Target: <strong>${targetNet.toFixed(2)} ${item.uom}</strong></div>
-          <div>Fisik: <strong style="color:var(--brand-navy); font-size:1rem;">${isCounted ? item.actualQty.toFixed(2) : '-'} ${item.uom}</strong></div>
-        </div>
-        <div class="compact-actions-row">
-          <button class="btn btn-success btn-sm" data-action="list-match">✅ Sesuai</button>
-          <button class="btn btn-secondary btn-sm" data-action="list-edit">✏️ Input Fisik</button>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button class="btn-core btn-primary btn-sm" data-action="list-match">✅ Sesuai</button>
+          <button class="btn-core btn-secondary btn-sm" data-action="list-edit">✏️ Input Fisik</button>
         </div>
       `;
 
@@ -671,13 +713,13 @@ class CycleCountApp {
     });
   }
 
-  // ================= 5. QUICK MATCH & MODAL ACTIONS =================
+  // ================= 9. QUICK MATCH & MODAL ACTIONS =================
   quickMatchItem(item) {
     const targetNet = item.qtySap - (item.pickingQty || 0);
     item.actualQty = targetNet;
     item.status = 'MATCHED';
     item.note = item.note || 'Fisik utuh sesuai target SAP';
-    item.countedBy = this.currentUser.name;
+    item.countedBy = this.currentUser ? this.currentUser.name : 'Petugas';
     item.countedAt = new Date().toISOString().replace('T', ' ').substring(0, 16);
 
     this.saveItems();
@@ -732,7 +774,7 @@ class CycleCountApp {
     this.activeEditItem.isMisplaced = isMisplaced;
     this.activeEditItem.newBin = isMisplaced ? newBin : '';
     this.activeEditItem.note = note;
-    this.activeEditItem.countedBy = this.currentUser.name;
+    this.activeEditItem.countedBy = this.currentUser ? this.currentUser.name : 'Petugas';
     this.activeEditItem.countedAt = new Date().toISOString().replace('T', ' ').substring(0, 16);
 
     if (Math.abs(actualQty - targetNet) < 0.001) {
@@ -752,7 +794,7 @@ class CycleCountApp {
     this.renderPrintout();
   }
 
-  // ================= 6. DASHBOARD & REKONSILIASI RENDERING =================
+  // ================= 10. DASHBOARD RENDERING (TABLE EDITOR) =================
   renderDashboard() {
     let total = this.items.length;
     let matched = 0;
@@ -783,6 +825,10 @@ class CycleCountApp {
     document.getElementById('dash-misplaced-items').textContent = `${misplacedCount} Item`;
     document.getElementById('dash-total-items').textContent = total;
     
+    // Navbar badge count
+    const navBadge = document.getElementById('nav-item-count');
+    if (navBadge) navBadge.textContent = total;
+
     let totalSapKg = 0;
     this.items.forEach(i => totalSapKg += i.qtySap);
     document.getElementById('dash-total-sap').textContent = `Total SAP: ${totalSapKg.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
@@ -819,7 +865,7 @@ class CycleCountApp {
     if (filteredItems.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="14" style="text-align: center; padding: 3rem; color: var(--sb-text-med);">
+          <td colspan="14" style="text-align: center; padding: 3rem; color: var(--text-muted);">
             Tidak ada item yang sesuai dengan filter pencarian.
           </td>
         </tr>
@@ -834,41 +880,41 @@ class CycleCountApp {
       const isDiff = isCounted && Math.abs(diff) >= 0.001;
 
       const tr = document.createElement('tr');
-      if (isDiff) tr.className = 'row-diff';
-      if (item.isMisplaced) tr.className = 'row-reloc';
+      if (isDiff) tr.className = 'row-discrepancy';
+      if (item.isMisplaced) tr.className = 'row-relocated';
 
-      let statusBadge = '<span class="sb-badge sb-badge-pending">PENDING</span>';
+      let statusBadge = '<span class="app-badge badge-pending">PENDING</span>';
       if (isCounted) {
-        statusBadge = isDiff ? '<span class="sb-badge sb-badge-diff">SELISIH</span>' : '<span class="sb-badge sb-badge-match">COCOK</span>';
+        statusBadge = isDiff ? '<span class="app-badge badge-diff">SELISIH</span>' : '<span class="app-badge badge-match">COCOK</span>';
       }
-      if (item.isMisplaced) statusBadge += ` <span class="sb-badge sb-badge-reloc">PINDAH</span>`;
+      if (item.isMisplaced) statusBadge += ` <span class="app-badge badge-reloc">PINDAH</span>`;
 
       tr.innerHTML = `
-        <td style="text-align: center; color: var(--sb-text-med); font-family: var(--font-mono);">${item.no || idx + 1}</td>
-        <td><span class="sb-badge-bin">${item.bin}</span></td>
-        <td class="font-mono">${item.materialNumber}</td>
+        <td style="text-align: center; color: var(--text-muted); font-family: var(--font-mono);">${item.no || idx + 1}</td>
+        <td><span class="badge-bin">${item.bin}</span></td>
+        <td class="font-mono" style="color: var(--text-secondary);">${item.materialNumber}</td>
         <td>
-          <div style="font-weight: 700; color: #fff;">${item.materialDesc}</div>
-          ${item.unitConversion ? `<div style="font-size: 0.72rem; color: var(--sb-text-med); margin-top: 0.15rem;">${item.unitConversion}</div>` : ''}
+          <div style="font-weight: 700; color: var(--text-main);">${item.materialDesc}</div>
+          ${item.unitConversion ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem;">${item.unitConversion}</div>` : ''}
         </td>
-        <td class="font-mono" style="color: var(--sb-info); font-weight: 700; white-space: nowrap;">${item.batchFisik}</td>
-        <td class="font-mono" style="color: var(--sb-text-med); white-space: nowrap;">${item.batchSap}</td>
+        <td class="font-mono" style="color: var(--brand-primary); font-weight: 700; white-space: nowrap;">${item.batchFisik}</td>
+        <td class="font-mono" style="color: var(--text-muted); white-space: nowrap;">${item.batchSap}</td>
         <td class="num-cell">${item.qtySap.toFixed(2)}</td>
-        <td class="num-cell" style="color: ${item.pickingQty > 0 ? 'var(--sb-warning)' : 'inherit'};">${item.pickingQty.toFixed(2)}</td>
-        <td class="num-cell" style="font-weight: 800; color: #fff;">${targetNet.toFixed(2)}</td>
-        <td class="num-cell" style="font-weight: 800; color: ${isCounted ? (isDiff ? 'var(--sb-danger)' : 'var(--sb-brand)') : 'var(--sb-text-low)'};">
+        <td class="num-cell" style="color: ${item.pickingQty > 0 ? 'var(--status-pending)' : 'inherit'};">${item.pickingQty.toFixed(2)}</td>
+        <td class="num-cell" style="font-weight: 800; color: var(--text-main);">${targetNet.toFixed(2)}</td>
+        <td class="num-cell" style="font-weight: 800; color: ${isCounted ? (isDiff ? 'var(--status-diff)' : 'var(--brand-primary)') : 'var(--text-muted)'};">
           ${isCounted ? item.actualQty.toFixed(2) : '-'}
         </td>
-        <td class="num-cell" style="font-weight: 800; color: ${isDiff ? 'var(--sb-danger)' : (isCounted ? 'var(--sb-brand)' : 'var(--sb-text-low)')};">
+        <td class="num-cell" style="font-weight: 800; color: ${isDiff ? 'var(--status-diff)' : (isCounted ? 'var(--brand-primary)' : 'var(--text-muted)')};">
           ${isCounted ? (diff >= 0 ? '+' : '') + diff.toFixed(2) : '-'}
         </td>
         <td style="text-align: center;">${statusBadge}</td>
-        <td style="font-size: 0.75rem; color: var(--sb-text-med);">
+        <td style="font-size: 0.78rem; color: var(--text-secondary);">
           ${item.note || '-'}
-          ${item.isMisplaced && item.newBin ? `<div style="color: var(--sb-info); font-weight: 600; margin-top: 0.2rem;">↳ Pindah ke: ${item.newBin}</div>` : ''}
+          ${item.isMisplaced && item.newBin ? `<div style="color: var(--status-reloc); font-weight: 600; margin-top: 0.2rem;">↳ Pindah ke: ${item.newBin}</div>` : ''}
         </td>
         <td style="text-align: center;">
-          <button class="sb-btn sb-btn-secondary sb-btn-sm" data-action="tbl-edit">Edit</button>
+          <button class="btn-core btn-secondary btn-sm" data-action="tbl-edit">Edit</button>
         </td>
       `;
 
@@ -880,7 +926,7 @@ class CycleCountApp {
     });
   }
 
-  // ================= 7. OFFICIAL PRINTOUT RENDERING =================
+  // ================= 11. OFFICIAL PRINTOUT RENDERING =================
   renderPrintout() {
     const tbody = document.getElementById('printout-tbody');
     tbody.innerHTML = '';
@@ -921,7 +967,7 @@ class CycleCountApp {
     });
   }
 
-  // ================= 8. EXPORT CSV & DEMO RESET =================
+  // ================= 12. EXPORT CSV & RESET =================
   exportCsv() {
     const headers = ['No', 'BIN', 'Kode Material', 'Deskripsi Material', 'Batch Fisik Vendor', 'Batch SAP', 'Qty SAP', 'Picking', 'Target Net', 'Aktual Fisik', 'Variance', 'Status', 'Catatan'];
     const rows = this.items.map((item, idx) => {
@@ -951,7 +997,7 @@ class CycleCountApp {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Hasil_Cycle_Count_RMPM_${this.schedule.scheduleDate}.csv`;
+    link.download = `Hasil_Cycle_Count_RMPM_${this.schedule.scheduleDate || 'Today'}.csv`;
     link.click();
   }
 

@@ -12,11 +12,22 @@ class SupabaseService {
   }
 
   init() {
+    this.url = (localStorage.getItem('rmpm_supabase_url') || APP_CONFIG.SUPABASE_URL || '').trim();
+    this.key = APP_CONFIG.SUPABASE_PUBLISHABLE_KEY;
+
+    if (this.url) {
+      // Auto-normalize URL (add https:// if missing, remove trailing slash)
+      if (!this.url.startsWith('http://') && !this.url.startsWith('https://')) {
+        this.url = 'https://' + this.url;
+      }
+      this.url = this.url.replace(/\/+$/, '');
+    }
+
     if (this.url && this.key && window.supabase) {
       try {
         this.client = window.supabase.createClient(this.url, this.key);
         this.isConnected = true;
-        console.log('[Supabase] Initialized successfully with:', this.url);
+        console.log('[Supabase] Initialized automatically with:', this.url);
       } catch (err) {
         console.warn('[Supabase] Init failed:', err);
         this.isConnected = false;
@@ -27,7 +38,14 @@ class SupabaseService {
   }
 
   setUrl(newUrl) {
-    this.url = newUrl.trim();
+    let clean = newUrl.trim();
+    if (clean) {
+      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+        clean = 'https://' + clean;
+      }
+      clean = clean.replace(/\/+$/, '');
+    }
+    this.url = clean;
     localStorage.setItem('rmpm_supabase_url', this.url);
     APP_CONFIG.SUPABASE_URL = this.url;
     this.init();
