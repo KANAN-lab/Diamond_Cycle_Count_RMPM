@@ -1,5 +1,6 @@
 // ==========================================================================
-// RMPM Cycle Count System - Main Logic & State Controller
+// RMPM Cycle Count System - Mobile-First Industrial WMS Controller
+// Built for Handheld Scanners & Mobile Phones with Desktop Reflow
 // ==========================================================================
 
 const STORAGE_KEYS = {
@@ -14,18 +15,17 @@ class CycleCountApp {
     this.schedule = {};
     this.users = INITIAL_USERS;
     this.currentUser = null;
-    this.activeTab = 'view-dashboard';
+    this.activeTab = 'view-checker'; // Default mobile view: Checker Count
 
-    // Filters
-    this.dashFilterBin = 'ALL';
-    this.dashFilterStatus = 'ALL';
-    this.dashSearchQuery = '';
+    // Mobile Location & Guided Walkthrough State
+    this.uniqueBins = [];
+    this.currentBinIndex = 0;
+    this.currentItemIndexInBin = 0;
+    this.isFocusMode = true; // true: Guided single-item Zebra style, false: Card List
+    this.activePackWeight = 25; // default 25 KG per Sak
 
-    this.checkerFilterBin = 'ALL';
-    this.checkerFilterStatus = 'ALL';
-    this.checkerSearchQuery = '';
-
-    // Active item being edited in modal
+    // Filters & Search
+    this.searchQuery = '';
     this.activeEditItem = null;
 
     this.init();
@@ -33,71 +33,17 @@ class CycleCountApp {
 
   async init() {
     this.loadState();
+    this.calculateUniqueBins();
     this.bindEvents();
     this.renderUserBar();
     this.updateSupabaseStatusUi();
+    this.renderActiveBinView();
     this.renderDashboard();
-    this.renderCheckerBinPills();
-    this.renderCheckerCards();
     this.renderPrintout();
 
-    // Initialize Supabase Sync if connected
+    // Supabase Real-time connection
     if (window.supabaseService && window.supabaseService.isConnected) {
       await this.initSupabaseSync();
-    }
-  }
-
-  updateSupabaseStatusUi() {
-    const dot = document.getElementById('sb-status-dot');
-    const text = document.getElementById('sb-status-text');
-    if (!dot || !text) return;
-
-    if (window.supabaseService && window.supabaseService.isConnected) {
-      dot.textContent = '🟢';
-      text.textContent = 'Supabase: Online (Sync)';
-      document.getElementById('btn-supabase-status').style.borderColor = '#16a34a';
-      document.getElementById('btn-supabase-status').style.background = '#052e16';
-    } else {
-      dot.textContent = '🟡';
-      text.textContent = 'Supabase: Setup URL';
-      document.getElementById('btn-supabase-status').style.borderColor = '#0284c7';
-      document.getElementById('btn-supabase-status').style.background = '#0c4a6e';
-    }
-  }
-
-  async initSupabaseSync() {
-    try {
-      const cloudItems = await window.supabaseService.fetchItems();
-      if (cloudItems && cloudItems.length > 0) {
-        this.items = cloudItems;
-        this.saveItems();
-        this.renderDashboard();
-        this.renderCheckerBinPills();
-        this.renderCheckerCards();
-        this.renderPrintout();
-        console.log('[Supabase] Loaded items from cloud successfully.');
-      }
-
-      // Realtime listener
-      window.supabaseService.subscribeToChanges((payload) => {
-        if (payload.new && payload.new.id) {
-          const idx = this.items.findIndex(i => i.id === payload.new.id);
-          if (idx !== -1) {
-            this.items[idx].actualQty = payload.new.actual_qty !== null ? parseFloat(payload.new.actual_qty) : null;
-            this.items[idx].note = payload.new.note || '';
-            this.items[idx].isMisplaced = !!payload.new.is_misplaced;
-            this.items[idx].newBin = payload.new.new_bin || '';
-            this.items[idx].status = payload.new.status || 'PENDING';
-            this.items[idx].countedBy = payload.new.counted_by || '';
-            this.saveItems();
-            this.renderDashboard();
-            this.renderCheckerCards();
-            this.renderPrintout();
-          }
-        }
-      });
-    } catch (err) {
-      console.warn('[Supabase Sync Error]', err);
     }
   }
 
@@ -128,19 +74,14 @@ class CycleCountApp {
       this.saveSchedule();
     }
 
-    // Load Current User
+    // Load Current User (Default: Checker Budi on mobile for fast count)
     const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (storedUser) {
       const found = this.users.find(u => u.id === storedUser);
-      this.currentUser = found || this.users[0];
+      this.currentUser = found || this.users[1];
     } else {
-      this.currentUser = this.users[0]; // Default: SPV Asep
+      this.currentUser = this.users[1]; // Checker Budi Santoso
     }
-
-    // Update Header Metadata
-    document.getElementById('header-schedule-date').textContent = this.schedule.scheduleDate;
-    document.getElementById('header-schedule-area').textContent = this.schedule.areaName;
-    document.getElementById('header-schedule-spv').textContent = this.schedule.spvName;
   }
 
   saveItems() {
@@ -155,22 +96,125 @@ class CycleCountApp {
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, this.currentUser.id);
   }
 
+  // ================= Unique BIN Calculations =================
+  calculateUniqueBins() {
+    const set = new Set();
+    this.items.forEach(i => set.add(i.bin));
+    this.uniqueBins = Array.from(set);
+    if (this.currentBinIndex >= this.uniqueBins.length) {
+      this.currentBinIndex = 0;
+    }
+  }
+
+  getCurrentBin() {
+    return this.uniqueBins[this.currentBinIndex] || (this.items[0] ? this.items[0].bin : 'B.01A.1.01');
+  }
+
+  getItemsInCurrentBin() {
+    const currentBin = this.getCurrentBin();
+    return this.items.filter(i => i.bin === currentBin);
+  }
+
   // ================= Event Listeners =================
   bindEvents() {
-    // Navigation Tabs
+    // Mobile Bottom Navigation
+    document.querySelectorAll('.bnav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetView = btn.getAttribute('data-target');
+        this.switchView(targetView);
+      });
+    });
+
+    // Desktop Navigation Tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
-      tab.addEventListener('click', (e) => {
+      tab.addEventListener('click', () => {
         const targetView = tab.getAttribute('data-target');
         this.switchView(targetView);
       });
     });
 
-    // User Switcher Modal Trigger
-    document.getElementById('btn-open-user-modal').addEventListener('click', () => {
-      this.openUserModal();
+    // BIN Steppers (◀ / ▶)
+    document.getElementById('btn-prev-bin').addEventListener('click', () => {
+      if (this.currentBinIndex > 0) {
+        this.currentBinIndex--;
+        this.currentItemIndexInBin = 0;
+        this.renderActiveBinView();
+      }
     });
 
-    // Close Modals
+    document.getElementById('btn-next-bin').addEventListener('click', () => {
+      if (this.currentBinIndex < this.uniqueBins.length - 1) {
+        this.currentBinIndex++;
+        this.currentItemIndexInBin = 0;
+        this.renderActiveBinView();
+      }
+    });
+
+    // Mode Toggle (🎯 Focus vs 📋 List)
+    document.getElementById('btn-toggle-focus-mode').addEventListener('click', () => {
+      this.isFocusMode = !this.isFocusMode;
+      const btn = document.getElementById('btn-toggle-focus-mode');
+      if (this.isFocusMode) {
+        btn.textContent = '🎯 Mode Fokus';
+        btn.classList.add('active');
+      } else {
+        btn.textContent = '📋 Mode List';
+        btn.classList.remove('active');
+      }
+      this.renderActiveBinView();
+    });
+
+    // Mobile Barcode & Search
+    document.getElementById('mobile-barcode-search').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      this.searchQuery = q;
+      this.handleSearchOrBarcode(q);
+    });
+
+    // Focus Item Steppers (Item Prev / Item Next in same BIN)
+    document.getElementById('fc-prev-item').addEventListener('click', () => {
+      if (this.currentItemIndexInBin > 0) {
+        this.currentItemIndexInBin--;
+        this.renderFocusWalkthrough();
+      }
+    });
+
+    document.getElementById('fc-next-item').addEventListener('click', () => {
+      const binItems = this.getItemsInCurrentBin();
+      if (this.currentItemIndexInBin < binItems.length - 1) {
+        this.currentItemIndexInBin++;
+        this.renderFocusWalkthrough();
+      }
+    });
+
+    // Focus Item 1-Tap Match Button
+    document.getElementById('fc-btn-match').addEventListener('click', () => {
+      const binItems = this.getItemsInCurrentBin();
+      const currentItem = binItems[this.currentItemIndexInBin];
+      if (currentItem) {
+        this.quickMatchItem(currentItem);
+      }
+    });
+
+    // Focus Item Open Input & Packaging Calc
+    document.getElementById('fc-btn-input-calc').addEventListener('click', () => {
+      const binItems = this.getItemsInCurrentBin();
+      const currentItem = binItems[this.currentItemIndexInBin];
+      if (currentItem) {
+        this.openCheckerInputModal(currentItem);
+      }
+    });
+
+    // Focus Item Misplaced Quick Trigger
+    document.getElementById('fc-btn-misplaced').addEventListener('click', () => {
+      const binItems = this.getItemsInCurrentBin();
+      const currentItem = binItems[this.currentItemIndexInBin];
+      if (currentItem) {
+        this.openCheckerInputModal(currentItem, true);
+      }
+    });
+
+    // Modal Close
     document.querySelectorAll('[data-close]').forEach(btn => {
       btn.addEventListener('click', () => {
         const modalId = btn.getAttribute('data-close');
@@ -178,62 +222,12 @@ class CycleCountApp {
       });
     });
 
-    // Close modal on clicking overlay backdrop
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          overlay.style.display = 'none';
-        }
-      });
+    // User Switcher Modal
+    document.getElementById('btn-open-user-modal').addEventListener('click', () => {
+      this.openUserModal();
     });
 
-    // Dashboard Search & Filters
-    document.getElementById('dash-search-input').addEventListener('input', (e) => {
-      this.dashSearchQuery = e.target.value.toLowerCase().trim();
-      this.renderDashboardTable();
-    });
-
-    document.getElementById('dash-filter-bin').addEventListener('change', (e) => {
-      this.dashFilterBin = e.target.value;
-      this.renderDashboardTable();
-    });
-
-    document.getElementById('dash-filter-status').addEventListener('change', (e) => {
-      this.dashFilterStatus = e.target.value;
-      this.renderDashboardTable();
-    });
-
-    // Checker Search & Filter
-    document.getElementById('checker-search-input').addEventListener('input', (e) => {
-      this.checkerSearchQuery = e.target.value.toLowerCase().trim();
-      this.renderCheckerCards();
-    });
-
-    document.getElementById('checker-status-filter').addEventListener('change', (e) => {
-      this.checkerFilterStatus = e.target.value;
-      this.renderCheckerCards();
-    });
-
-    // Export & Reset
-    document.getElementById('btn-export-csv').addEventListener('click', () => this.exportCsv());
-    document.getElementById('btn-reset-demo').addEventListener('click', () => this.resetDemoData());
-    document.getElementById('btn-go-to-print').addEventListener('click', () => this.switchView('view-printout'));
-    document.getElementById('btn-back-to-dash').addEventListener('click', () => this.switchView('view-dashboard'));
-
-    // Modal Checker Input Events
-    document.getElementById('check-is-misplaced').addEventListener('change', (e) => {
-      document.getElementById('misplaced-input-box').style.display = e.target.checked ? 'block' : 'none';
-    });
-
-    document.getElementById('btn-apply-calc').addEventListener('click', () => {
-      this.applyPackagingCalculator();
-    });
-
-    document.getElementById('btn-save-checker-input').addEventListener('click', () => {
-      this.saveCheckerItemInput();
-    });
-
-    // Supabase Cloud Configuration Modal Events
+    // Supabase Config Modal
     document.getElementById('btn-supabase-status').addEventListener('click', () => {
       document.getElementById('cfg-supabase-url').value = localStorage.getItem('rmpm_supabase_url') || '';
       document.getElementById('modal-supabase-config').style.display = 'flex';
@@ -242,7 +236,7 @@ class CycleCountApp {
     document.getElementById('btn-save-supabase-config').addEventListener('click', async () => {
       const urlInput = document.getElementById('cfg-supabase-url').value.trim();
       if (!urlInput) {
-        alert('Masukkan URL Supabase yang valid (contoh: https://xyz.supabase.co)!');
+        alert('Masukkan URL Supabase yang valid!');
         return;
       }
       if (window.supabaseService) {
@@ -251,24 +245,222 @@ class CycleCountApp {
         await this.initSupabaseSync();
       }
       document.getElementById('modal-supabase-config').style.display = 'none';
-      alert('Koneksi Supabase berhasil diperbarui!');
+      alert('Koneksi Supabase berhasil disimpan!');
     });
 
-    // Import SAP Events
-    document.getElementById('btn-process-import').addEventListener('click', () => {
-      this.processSapImport();
+    // Packaging Converter Steppers in Modal
+    this.bindPackagingModalEvents();
+
+    // Dashboard Buttons
+    document.getElementById('btn-dash-export').addEventListener('click', () => this.exportCsv());
+    document.getElementById('btn-dash-reset').addEventListener('click', () => this.resetDemoData());
+    document.getElementById('btn-dash-print').addEventListener('click', () => this.switchView('view-printout'));
+
+    // Import SAP Button
+    document.getElementById('btn-process-import').addEventListener('click', () => this.processSapImport());
+  }
+
+  bindPackagingModalEvents() {
+    // Preset buttons
+    document.querySelectorAll('.btn-pack-preset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-pack-preset').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const weightAttr = btn.getAttribute('data-weight');
+        if (weightAttr === 'custom') {
+          const userVal = prompt('Masukkan berat standar per kemasan (KG):', '25');
+          this.activePackWeight = parseFloat(userVal) || 25;
+        } else {
+          this.activePackWeight = parseFloat(weightAttr) || 25;
+        }
+        this.recalcPackagingModalTotal();
+      });
     });
-    document.getElementById('btn-cancel-import').addEventListener('click', () => {
-      this.switchView('view-dashboard');
+
+    // Minus / Plus Stepper
+    document.getElementById('btn-pack-minus').addEventListener('click', () => {
+      const input = document.getElementById('calc-pack-qty');
+      let val = parseInt(input.value) || 0;
+      if (val > 0) val--;
+      input.value = val;
+      this.recalcPackagingModalTotal();
+    });
+
+    document.getElementById('btn-pack-plus').addEventListener('click', () => {
+      const input = document.getElementById('calc-pack-qty');
+      let val = parseInt(input.value) || 0;
+      val++;
+      input.value = val;
+      this.recalcPackagingModalTotal();
+    });
+
+    document.getElementById('calc-pack-qty').addEventListener('input', () => {
+      this.recalcPackagingModalTotal();
+    });
+
+    document.getElementById('calc-pack-partial').addEventListener('input', () => {
+      this.recalcPackagingModalTotal();
+    });
+
+    document.getElementById('check-is-misplaced').addEventListener('change', (e) => {
+      document.getElementById('misplaced-input-box').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('btn-save-checker-input').addEventListener('click', () => {
+      this.saveCheckerItemInput();
     });
   }
 
-  // ================= Role & User Management =================
+  recalcPackagingModalTotal() {
+    const packCount = parseFloat(document.getElementById('calc-pack-qty').value) || 0;
+    const partialKg = parseFloat(document.getElementById('calc-pack-partial').value) || 0;
+    const calculatedTotal = (packCount * this.activePackWeight) + partialKg;
+
+    document.getElementById('input-actual-qty').value = calculatedTotal.toFixed(3);
+
+    // Auto set descriptive note if empty
+    const noteField = document.getElementById('input-item-note');
+    if (!noteField.value || noteField.value.includes('Sak') || noteField.value.includes('Box')) {
+      if (packCount > 0) {
+        noteField.value = `${packCount} Sak/Kemasan (@${this.activePackWeight}kg)${partialKg > 0 ? ' + ' + partialKg + ' kg sisa' : ''}`;
+      }
+    }
+  }
+
+  // ================= Barcode / Fast Search Handler =================
+  handleSearchOrBarcode(query) {
+    if (!query) {
+      this.renderActiveBinView();
+      return;
+    }
+
+    // 1. Direct BIN match?
+    const binIdx = this.uniqueBins.findIndex(b => b.toLowerCase() === query);
+    if (binIdx !== -1) {
+      this.currentBinIndex = binIdx;
+      this.currentItemIndexInBin = 0;
+      this.renderActiveBinView();
+      return;
+    }
+
+    // 2. Material Code / Batch match?
+    const itemIdx = this.items.findIndex(i =>
+      i.materialNumber.toLowerCase() === query ||
+      i.batchFisik.toLowerCase() === query ||
+      i.batchSap.toLowerCase() === query
+    );
+
+    if (itemIdx !== -1) {
+      const foundItem = this.items[itemIdx];
+      const targetBinIdx = this.uniqueBins.findIndex(b => b === foundItem.bin);
+      if (targetBinIdx !== -1) {
+        this.currentBinIndex = targetBinIdx;
+        const binItems = this.getItemsInCurrentBin();
+        const inBinIdx = binItems.findIndex(i => i.id === foundItem.id);
+        this.currentItemIndexInBin = inBinIdx !== -1 ? inBinIdx : 0;
+        this.renderActiveBinView();
+      }
+      return;
+    }
+
+    // 3. Fallback: filter list
+    this.renderActiveBinView();
+  }
+
+  // ================= Navigation View Switcher =================
+  switchView(viewId) {
+    this.activeTab = viewId;
+
+    // Toggle active sections
+    document.querySelectorAll('.view-section').forEach(s => {
+      s.classList.toggle('active', s.id === viewId);
+    });
+
+    // Mobile Bottom Nav buttons
+    document.querySelectorAll('.bnav-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-target') === viewId);
+    });
+
+    // Desktop Nav tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.getAttribute('data-target') === viewId);
+    });
+
+    // Show/hide Location strip (only in Checker view on mobile)
+    const locStrip = document.getElementById('global-location-strip');
+    if (locStrip) {
+      locStrip.style.display = viewId === 'view-checker' ? 'block' : 'none';
+    }
+
+    if (viewId === 'view-checker') {
+      this.renderActiveBinView();
+    } else if (viewId === 'view-dashboard') {
+      this.renderDashboard();
+    } else if (viewId === 'view-printout') {
+      this.renderPrintout();
+    }
+  }
+
+  // ================= User & Cloud Status =================
   renderUserBar() {
     if (!this.currentUser) return;
     document.getElementById('user-avatar-initial').textContent = this.currentUser.name.charAt(0);
-    document.getElementById('current-user-name').textContent = this.currentUser.name;
-    document.getElementById('current-user-role').textContent = this.currentUser.badge;
+    document.getElementById('current-user-name').textContent = this.currentUser.name.split(' ')[0];
+    document.getElementById('current-user-role').textContent = this.currentUser.role;
+  }
+
+  updateSupabaseStatusUi() {
+    const dot = document.getElementById('sb-status-dot');
+    const text = document.getElementById('sb-status-text');
+    const btn = document.getElementById('btn-supabase-status');
+    if (!dot || !text || !btn) return;
+
+    if (window.supabaseService && window.supabaseService.isConnected) {
+      dot.textContent = '🟢';
+      text.textContent = 'Online';
+      btn.style.borderColor = '#16a34a';
+      btn.style.background = '#052e16';
+    } else {
+      dot.textContent = '🟡';
+      text.textContent = 'Setup';
+      btn.style.borderColor = '#0284c7';
+      btn.style.background = '#0c4a6e';
+    }
+  }
+
+  async initSupabaseSync() {
+    try {
+      const cloudItems = await window.supabaseService.fetchItems();
+      if (cloudItems && cloudItems.length > 0) {
+        this.items = cloudItems;
+        this.calculateUniqueBins();
+        this.saveItems();
+        this.renderActiveBinView();
+        this.renderDashboard();
+        this.renderPrintout();
+      }
+
+      window.supabaseService.subscribeToChanges((payload) => {
+        if (payload.new && payload.new.id) {
+          const idx = this.items.findIndex(i => i.id === payload.new.id);
+          if (idx !== -1) {
+            this.items[idx].actualQty = payload.new.actual_qty !== null ? parseFloat(payload.new.actual_qty) : null;
+            this.items[idx].note = payload.new.note || '';
+            this.items[idx].isMisplaced = !!payload.new.is_misplaced;
+            this.items[idx].newBin = payload.new.new_bin || '';
+            this.items[idx].status = payload.new.status || 'PENDING';
+            this.items[idx].countedBy = payload.new.counted_by || '';
+            this.saveItems();
+            this.renderActiveBinView();
+            this.renderDashboard();
+            this.renderPrintout();
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('[Supabase Sync Error]', e);
+    }
   }
 
   openUserModal() {
@@ -279,23 +471,24 @@ class CycleCountApp {
       const isCurrent = u.id === this.currentUser.id;
       const card = document.createElement('div');
       card.style.cssText = `
-        border: 1px solid ${isCurrent ? 'var(--brand-primary)' : 'var(--border-color)'};
+        border: 1px solid ${isCurrent ? 'var(--brand-blue)' : 'var(--border-light)'};
         background-color: ${isCurrent ? '#f0f9ff' : '#ffffff'};
-        padding: 0.65rem 0.85rem;
+        padding: 0.75rem;
         border-radius: var(--radius-sm);
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        margin-bottom: 0.5rem;
       `;
 
       card.innerHTML = `
         <div>
-          <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main);">${u.name}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">${u.title} &bull; <strong>${u.badge}</strong></div>
+          <div style="font-weight: 800; font-size: 0.9rem;">${u.name}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">${u.title} &bull; <strong>${u.badge}</strong></div>
         </div>
         <div>
-          ${isCurrent ? '<span style="font-size: 0.7rem; color: var(--brand-primary); font-weight: 700;">AKTIF</span>' : '<button class="btn btn-secondary btn-sm" style="font-size: 0.7rem;">Pilih</button>'}
+          ${isCurrent ? '<span style="font-size: 0.75rem; color: var(--brand-blue); font-weight: 800;">AKTIF</span>' : '<button class="btn btn-secondary btn-sm">Pilih</button>'}
         </div>
       `;
 
@@ -305,7 +498,6 @@ class CycleCountApp {
         this.renderUserBar();
         document.getElementById('modal-user-switcher').style.display = 'none';
 
-        // Auto adjust view recommendation based on role
         if (u.role === 'CHECKER') {
           this.switchView('view-checker');
         } else {
@@ -319,333 +511,160 @@ class CycleCountApp {
     document.getElementById('modal-user-switcher').style.display = 'flex';
   }
 
-  switchView(viewId) {
-    this.activeTab = viewId;
+  // ================= 4. CHECKER ACTIVE BIN VIEW RENDERING =================
+  renderActiveBinView() {
+    const currentBin = this.getCurrentBin();
+    const binItems = this.getItemsInCurrentBin();
 
-    // Toggle active nav tab
-    document.querySelectorAll('.nav-tab').forEach(t => {
-      if (t.getAttribute('data-target') === viewId) {
-        t.classList.add('active');
-      } else {
-        t.classList.remove('active');
-      }
-    });
+    // Update location strip
+    document.getElementById('display-active-bin').textContent = currentBin;
+    document.getElementById('display-active-bin-counter').textContent =
+      `Rak ${this.currentBinIndex + 1} dari ${this.uniqueBins.length} &bull; ${binItems.length} Item`;
 
-    // Toggle active section
-    document.querySelectorAll('.view-section').forEach(s => {
-      if (s.id === viewId) {
-        s.classList.add('active');
-      } else {
-        s.classList.remove('active');
-      }
-    });
+    // Stepper button disabled states
+    document.getElementById('btn-prev-bin').disabled = this.currentBinIndex === 0;
+    document.getElementById('btn-next-bin').disabled = this.currentBinIndex >= this.uniqueBins.length - 1;
 
-    // Re-render target
-    if (viewId === 'view-dashboard') {
-      this.renderDashboard();
-    } else if (viewId === 'view-checker') {
-      this.renderCheckerCards();
-    } else if (viewId === 'view-printout') {
-      this.renderPrintout();
+    if (this.isFocusMode) {
+      document.getElementById('checker-focus-container').style.display = 'block';
+      document.getElementById('checker-list-container').style.display = 'none';
+      this.renderFocusWalkthrough();
+    } else {
+      document.getElementById('checker-focus-container').style.display = 'none';
+      document.getElementById('checker-list-container').style.display = 'flex';
+      this.renderCardList(binItems);
     }
   }
 
-  // ================= KPI Calculations =================
-  getKpiMetrics() {
-    const total = this.items.length;
-    let counted = 0;
-    let matched = 0;
-    let discrepancy = 0;
-    let misplaced = 0;
-    let totalSapKg = 0;
-    let totalActualKg = 0;
-    let netVarianceKg = 0;
+  renderFocusWalkthrough() {
+    const binItems = this.getItemsInCurrentBin();
+    if (binItems.length === 0) return;
 
-    this.items.forEach(item => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      totalSapKg += item.qtySap;
-
-      if (item.actualQty !== null && item.actualQty !== undefined) {
-        counted++;
-        totalActualKg += item.actualQty;
-        const diff = item.actualQty - targetNet;
-        netVarianceKg += diff;
-
-        if (Math.abs(diff) < 0.001) {
-          matched++;
-        } else {
-          discrepancy++;
-        }
-      }
-
-      if (item.isMisplaced) {
-        misplaced++;
-      }
-    });
-
-    const pending = total - counted;
-    const iraRate = total > 0 ? ((matched / total) * 100).toFixed(1) : '0.0';
-    const progressRate = total > 0 ? ((counted / total) * 100).toFixed(0) : '0';
-
-    return {
-      total,
-      counted,
-      pending,
-      matched,
-      discrepancy,
-      misplaced,
-      totalSapKg: totalSapKg.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-      netVarianceKg: (netVarianceKg >= 0 ? '+' : '') + netVarianceKg.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-      iraRate,
-      progressRate
-    };
-  }
-
-  // ================= Dashboard Rendering =================
-  renderDashboard() {
-    const kpi = this.getKpiMetrics();
-
-    // Update KPIs
-    document.getElementById('kpi-total-items').textContent = kpi.total;
-    document.getElementById('kpi-total-sap-weight').textContent = `Total SAP: ${kpi.totalSapKg} KG`;
-    document.getElementById('kpi-ira-rate').textContent = `${kpi.iraRate}%`;
-    document.getElementById('kpi-ira-count').textContent = `(${kpi.matched} Cocok)`;
-    document.getElementById('kpi-discrepancy-items').textContent = kpi.discrepancy;
-    document.getElementById('kpi-net-variance').textContent = `Net Selisih: ${kpi.netVarianceKg} KG`;
-    document.getElementById('kpi-progress-rate').textContent = `${kpi.progressRate}%`;
-    document.getElementById('kpi-progress-fraction').textContent = `(${kpi.counted} / ${kpi.total})`;
-    document.getElementById('kpi-pending-items').textContent = `${kpi.pending} item menunggu hitung`;
-    document.getElementById('kpi-misplaced-count').textContent = kpi.misplaced;
-
-    // Badges in tabs
-    document.getElementById('tab-total-badge').textContent = kpi.total;
-    document.getElementById('tab-pending-badge').textContent = kpi.pending;
-
-    this.renderDashboardTable();
-  }
-
-  renderDashboardTable() {
-    const tbody = document.getElementById('master-table-body');
-    tbody.innerHTML = '';
-
-    const filtered = this.getFilteredItems(this.dashFilterBin, this.dashFilterStatus, this.dashSearchQuery);
-
-    if (filtered.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="16" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-            Tidak ada item yang sesuai dengan filter atau kata kunci pencarian.
-          </td>
-        </tr>
-      `;
-      return;
+    if (this.currentItemIndexInBin >= binItems.length) {
+      this.currentItemIndexInBin = 0;
     }
 
-    filtered.forEach((item, idx) => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const variance = isCounted ? (item.actualQty - targetNet) : null;
-      const isDiff = isCounted && Math.abs(variance) >= 0.001;
+    const item = binItems[this.currentItemIndexInBin];
+    const targetNet = item.qtySap - (item.pickingQty || 0);
+    const isCounted = item.actualQty !== null && item.actualQty !== undefined;
+    const diff = isCounted ? (item.actualQty - targetNet) : null;
+    const isDiff = isCounted && Math.abs(diff) >= 0.001;
 
-      const tr = document.createElement('tr');
-      if (isDiff) tr.classList.add('row-discrepancy');
-      if (item.isMisplaced) tr.classList.add('row-misplaced');
+    // Set Card UI
+    document.getElementById('fc-bin').textContent = item.bin;
+    document.getElementById('fc-mat-desc').textContent = item.materialDesc;
+    document.getElementById('fc-mat-code').textContent = item.materialNumber;
+    document.getElementById('fc-uom').textContent = item.uom;
+    document.getElementById('fc-batch-fisik').textContent = item.batchFisik;
+    document.getElementById('fc-batch-sap').textContent = item.batchSap;
+    document.getElementById('fc-exp-date').textContent = item.expDate;
+    document.getElementById('fc-picking').textContent = `${item.pickingQty.toFixed(1)} ${item.uom}`;
+    document.getElementById('fc-target-net').textContent = `${targetNet.toFixed(3)} ${item.uom}`;
+    document.getElementById('fc-sap-raw').textContent = item.qtySap.toFixed(2);
 
-      let varianceHtml = '<span style="color: var(--text-muted);">-</span>';
-      if (isCounted) {
-        if (Math.abs(variance) < 0.001) {
-          varianceHtml = '<span class="variance-zero">0.000</span>';
-        } else if (variance > 0) {
-          varianceHtml = `<span class="variance-pos">+${variance.toFixed(3)}</span>`;
-        } else {
-          varianceHtml = `<span class="variance-neg">${variance.toFixed(3)}</span>`;
-        }
-      }
-
-      let statusBadge = '<span class="badge badge-pending">PENDING</span>';
-      if (isCounted) {
-        if (isDiff) {
-          statusBadge = '<span class="badge badge-discrepancy">SELISIH</span>';
-        } else {
-          statusBadge = '<span class="badge badge-matched">COCOK</span>';
-        }
-      }
-      if (item.isMisplaced) {
-        statusBadge += ` <span class="badge badge-misplaced" title="Pindah ke ${item.newBin}">PINDAH</span>`;
-      }
-
-      tr.innerHTML = `
-        <td class="text-center font-mono">${item.no || idx + 1}</td>
-        <td><span class="badge-bin">${item.bin}</span></td>
-        <td class="font-mono">${item.materialNumber}</td>
-        <td>
-          <div style="font-weight: 600;">${item.materialDesc}</div>
-          ${item.unitConversion ? `<div style="font-size: 0.72rem; color: var(--text-muted);">${item.unitConversion}</div>` : ''}
-        </td>
-        <td class="font-mono">${item.batchSap}</td>
-        <td class="font-mono" style="color: #0369a1; font-weight: 600;">${item.batchFisik}</td>
-        <td class="font-mono">${item.expDate}</td>
-        <td class="text-center">${item.uom}</td>
-        <td class="text-right font-mono">${item.qtySap.toFixed(3)}</td>
-        <td class="text-right font-mono" style="color: ${item.pickingQty > 0 ? '#b45309' : 'inherit'};">${item.pickingQty.toFixed(3)}</td>
-        <td class="text-right font-mono" style="font-weight: 700;">${targetNet.toFixed(3)}</td>
-        <td class="text-right font-mono" style="font-weight: 700; color: ${isDiff ? 'var(--status-discrepancy)' : 'var(--text-main)'};">
-          ${isCounted ? item.actualQty.toFixed(3) : '<em style="color:#94a3b8">Belum</em>'}
-        </td>
-        <td class="text-right font-mono">${varianceHtml}</td>
-        <td class="text-center">${statusBadge}</td>
-        <td style="font-size: 0.75rem;">
-          ${item.note || '-'}
-          ${item.isMisplaced && item.newBin ? `<div style="color: var(--status-misplaced); font-weight: 600;">↳ Lokasi baru: ${item.newBin}</div>` : ''}
-        </td>
-        <td class="text-center">
-          <button class="btn btn-secondary btn-sm" data-action="edit" data-id="${item.id}" title="Edit Fisik">✏️ Edit</button>
-        </td>
-      `;
-
-      tr.querySelector('[data-action="edit"]').addEventListener('click', () => {
-        this.openCheckerInputModal(item);
-      });
-
-      tbody.appendChild(tr);
-    });
-  }
-
-  // ================= Checker View Rendering =================
-  renderCheckerBinPills() {
-    const scroller = document.getElementById('checker-bin-pills');
-    scroller.innerHTML = '';
-
-    // Collect unique zones (e.g., B.01A, B.01B, B.02A, B.02B)
-    const binsSet = new Set();
-    this.items.forEach(i => {
-      const parts = i.bin.split('.');
-      if (parts.length >= 2) {
-        binsSet.add(`${parts[0]}.${parts[1]}`);
+    // Status Badge
+    let badgeHtml = '<span class="badge badge-pending">BELUM HITUNG</span>';
+    if (isCounted) {
+      if (isDiff) {
+        badgeHtml = '<span class="badge badge-discrepancy">⚠️ SELISIH</span>';
       } else {
-        binsSet.add(i.bin);
+        badgeHtml = '<span class="badge badge-matched">✅ COCOK</span>';
       }
-    });
+    }
+    if (item.isMisplaced) {
+      badgeHtml += ` <span class="badge badge-misplaced">PINDAH: ${item.newBin}</span>`;
+    }
+    document.getElementById('fc-status-badge').innerHTML = badgeHtml;
 
-    const allBtn = document.createElement('button');
-    allBtn.className = `bin-pill-btn ${this.checkerFilterBin === 'ALL' ? 'active' : ''}`;
-    allBtn.textContent = 'Semua Rak / BIN';
-    allBtn.addEventListener('click', () => {
-      this.checkerFilterBin = 'ALL';
-      this.renderCheckerBinPills();
-      this.renderCheckerCards();
-    });
-    scroller.appendChild(allBtn);
+    // Actual Figure & Diff
+    if (isCounted) {
+      document.getElementById('fc-actual-val').textContent = `${item.actualQty.toFixed(3)} ${item.uom}`;
+      if (isDiff) {
+        document.getElementById('fc-diff-val').textContent = `Selisih: ${(diff >= 0 ? '+' : '') + diff.toFixed(3)} ${item.uom}`;
+        document.getElementById('fc-diff-val').style.display = 'block';
+      } else {
+        document.getElementById('fc-diff-val').textContent = `Match (0.000 ${item.uom})`;
+        document.getElementById('fc-diff-val').style.color = 'var(--status-match)';
+        document.getElementById('fc-diff-val').style.display = 'block';
+      }
+    } else {
+      document.getElementById('fc-actual-val').textContent = `- ${item.uom}`;
+      document.getElementById('fc-diff-val').style.display = 'none';
+    }
 
-    Array.from(binsSet).sort().forEach(zone => {
-      const btn = document.createElement('button');
-      btn.className = `bin-pill-btn ${this.checkerFilterBin === zone ? 'active' : ''}`;
-      btn.textContent = `Rak ${zone}`;
-      btn.addEventListener('click', () => {
-        this.checkerFilterBin = zone;
-        this.renderCheckerBinPills();
-        this.renderCheckerCards();
-      });
-      scroller.appendChild(btn);
-    });
+    // Notes Box
+    const notesBox = document.getElementById('fc-notes-box');
+    if (item.note || item.isMisplaced) {
+      notesBox.style.display = 'block';
+      let noteText = item.note || '';
+      if (item.isMisplaced && item.newBin) {
+        noteText += ` [Ditemukan di BIN ${item.newBin}]`;
+      }
+      document.getElementById('fc-note-text').textContent = noteText;
+    } else {
+      notesBox.style.display = 'none';
+    }
+
+    // Match Button text
+    document.getElementById('fc-btn-match-text').textContent = `Sesuai Target (${targetNet.toFixed(0)} ${item.uom})`;
+
+    // Steppers inside BIN
+    document.getElementById('fc-item-step-text').textContent = `Item ${this.currentItemIndexInBin + 1} dari ${binItems.length}`;
+    document.getElementById('fc-prev-item').disabled = this.currentItemIndexInBin === 0;
+    document.getElementById('fc-next-item').disabled = this.currentItemIndexInBin >= binItems.length - 1;
   }
 
-  renderCheckerCards() {
-    const container = document.getElementById('checker-cards-container');
+  renderCardList(binItems) {
+    const container = document.getElementById('checker-list-container');
     container.innerHTML = '';
 
-    const filtered = this.getFilteredItems(this.checkerFilterBin, this.checkerFilterStatus, this.checkerSearchQuery);
-
-    if (filtered.length === 0) {
-      container.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: #ffffff; border-radius: var(--radius-md); border: 1px dashed var(--border-color); color: var(--text-muted);">
-          <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">Tidak ada item pada filter ini</p>
-          <p style="font-size: 0.85rem;">Coba pilih zona rak lain atau bersihkan kata kunci pencarian barcode/material.</p>
-        </div>
-      `;
+    if (binItems.length === 0) {
+      container.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Tidak ada item di rak ini.</div>`;
       return;
     }
 
-    filtered.forEach(item => {
+    binItems.forEach((item, idx) => {
       const targetNet = item.qtySap - (item.pickingQty || 0);
       const isCounted = item.actualQty !== null && item.actualQty !== undefined;
       const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
 
-      let cardClass = 'count-card card-pending';
-      let statusBadge = '<span class="badge badge-pending">BELUM HITUNG</span>';
-
+      let cardClass = 'compact-card card-wait';
+      let badge = '<span class="badge badge-pending">BELUM</span>';
       if (isCounted) {
         if (isDiff) {
-          cardClass = 'count-card card-discrepancy';
-          statusBadge = '<span class="badge badge-discrepancy">SELISIH</span>';
+          cardClass = 'compact-card card-diff';
+          badge = '<span class="badge badge-discrepancy">SELISIH</span>';
         } else {
-          cardClass = 'count-card card-matched';
-          statusBadge = '<span class="badge badge-matched">COCOK</span>';
+          cardClass = 'compact-card card-matched';
+          badge = '<span class="badge badge-matched">COCOK</span>';
         }
       }
 
       const card = document.createElement('div');
       card.className = cardClass;
-
       card.innerHTML = `
-        <div>
-          <div class="card-header-row">
-            <span class="badge-bin">${item.bin}</span>
-            <div>${statusBadge}</div>
-          </div>
-
-          <div class="card-material-name">${item.materialDesc}</div>
-          <div class="card-material-code">Kode: ${item.materialNumber} &bull; UoM: <strong>${item.uom}</strong></div>
-
-          <div class="card-details-grid">
-            <div class="detail-item">
-              <span>Batch SAP:</span>
-              <strong>${item.batchSap}</strong>
-            </div>
-            <div class="detail-item">
-              <span>Batch Fisik / Vendor:</span>
-              <strong style="color: #0284c7;">${item.batchFisik}</strong>
-            </div>
-            <div class="detail-item">
-              <span>Expired Date:</span>
-              <strong>${item.expDate}</strong>
-            </div>
-            <div class="detail-item">
-              <span>Picking Reservasi:</span>
-              <strong style="color: ${item.pickingQty > 0 ? '#b45309' : '#0f172a'}">${item.pickingQty.toFixed(1)} ${item.uom}</strong>
-            </div>
-          </div>
-
-          <div class="card-qty-row">
-            <div class="qty-target">
-              Target Bersih (SAP - Pick):<br>
-              <strong>${targetNet.toFixed(3)} ${item.uom}</strong>
-            </div>
-            <div class="qty-actual">
-              Fisik Aktual:<br>
-              <strong>${isCounted ? item.actualQty.toFixed(3) + ' ' + item.uom : '<span style="color:#94a3b8">-</span>'}</strong>
-            </div>
-          </div>
-
-          ${item.note ? `<div class="card-note-box">📝 ${item.note}</div>` : ''}
-          ${item.isMisplaced && item.newBin ? `<div class="card-note-box" style="background-color: var(--status-misplaced-bg); border-color: var(--status-misplaced); color: var(--status-misplaced);">📦 Pindah ke Lokasi: <strong>${item.newBin}</strong></div>` : ''}
+        <div class="compact-card-header">
+          <div class="compact-card-title">${item.materialDesc}</div>
+          <div>${badge}</div>
         </div>
-
-        <div class="card-action-bar">
-          <button class="btn btn-success btn-sm" data-action="quick-match" data-id="${item.id}" title="Jika fisik sesuai target SAP">
-            ✅ Cocok (${targetNet.toFixed(0)})
-          </button>
-          <button class="btn btn-secondary btn-sm" data-action="input-detail" data-id="${item.id}" title="Input angka fisik / selisih / konversi kemasan">
-            ✏️ Input Fisik
-          </button>
+        <div class="compact-card-meta">
+          Kode: ${item.materialNumber} &bull; Batch Vendor: <strong style="color:var(--brand-blue);">${item.batchFisik}</strong>
+        </div>
+        <div class="compact-card-body">
+          <div>Target: <strong>${targetNet.toFixed(2)} ${item.uom}</strong></div>
+          <div>Fisik: <strong style="color:var(--brand-navy); font-size:1rem;">${isCounted ? item.actualQty.toFixed(2) : '-'} ${item.uom}</strong></div>
+        </div>
+        <div class="compact-actions-row">
+          <button class="btn btn-success btn-sm" data-action="list-match">✅ Sesuai</button>
+          <button class="btn btn-secondary btn-sm" data-action="list-edit">✏️ Input Fisik</button>
         </div>
       `;
 
-      card.querySelector('[data-action="quick-match"]').addEventListener('click', () => {
+      card.querySelector('[data-action="list-match"]').addEventListener('click', () => {
         this.quickMatchItem(item);
       });
 
-      card.querySelector('[data-action="input-detail"]').addEventListener('click', () => {
+      card.querySelector('[data-action="list-edit"]').addEventListener('click', () => {
         this.openCheckerInputModal(item);
       });
 
@@ -653,6 +672,7 @@ class CycleCountApp {
     });
   }
 
+  // ================= 5. QUICK MATCH & MODAL ACTIONS =================
   quickMatchItem(item) {
     const targetNet = item.qtySap - (item.pickingQty || 0);
     item.actualQty = targetNet;
@@ -665,75 +685,49 @@ class CycleCountApp {
     if (window.supabaseService) {
       window.supabaseService.syncItem(item);
     }
+
+    this.renderActiveBinView();
     this.renderDashboard();
-    this.renderCheckerCards();
     this.renderPrintout();
   }
 
-  // ================= Modal Checker Input & Packaging Calculator =================
-  openCheckerInputModal(item) {
+  openCheckerInputModal(item, forceMisplaced = false) {
     this.activeEditItem = item;
     const targetNet = item.qtySap - (item.pickingQty || 0);
 
-    document.getElementById('modal-item-title').textContent = `Input Fisik: ${item.bin}`;
-    document.getElementById('m-item-bin').textContent = item.bin;
-    document.getElementById('m-item-batch-fisik').textContent = item.batchFisik;
     document.getElementById('m-item-desc').textContent = item.materialDesc;
     document.getElementById('m-item-code').textContent = item.materialNumber;
-    document.getElementById('m-item-sap').textContent = item.qtySap.toFixed(3);
-    document.getElementById('m-item-picking').textContent = item.pickingQty.toFixed(3);
-    document.getElementById('m-item-net').textContent = targetNet.toFixed(3);
+    document.getElementById('m-item-net').textContent = `${targetNet.toFixed(3)} ${item.uom}`;
+    document.getElementById('m-item-batch-fisik').textContent = item.batchFisik;
 
-    // Form inputs
-    document.getElementById('input-actual-qty').value = item.actualQty !== null ? item.actualQty : '';
-    document.getElementById('check-is-misplaced').checked = !!item.isMisplaced;
-    document.getElementById('misplaced-input-box').style.display = item.isMisplaced ? 'block' : 'none';
-    document.getElementById('input-new-bin').value = item.newBin || '';
-    document.getElementById('input-item-note').value = item.note || '';
-
-    // Clear calc fields
     document.getElementById('calc-pack-qty').value = '';
     document.getElementById('calc-pack-partial').value = '';
+    document.getElementById('input-actual-qty').value = item.actualQty !== null ? item.actualQty : '';
+    document.getElementById('input-item-note').value = item.note || '';
+
+    // Misplaced
+    const isMisplaced = forceMisplaced || item.isMisplaced;
+    document.getElementById('check-is-misplaced').checked = isMisplaced;
+    document.getElementById('misplaced-input-box').style.display = isMisplaced ? 'block' : 'none';
+    document.getElementById('input-new-bin').value = item.newBin || '';
 
     document.getElementById('modal-checker-input').style.display = 'flex';
-  }
-
-  applyPackagingCalculator() {
-    const packType = document.getElementById('calc-pack-type').value;
-    const packQty = parseFloat(document.getElementById('calc-pack-qty').value) || 0;
-    const partialKg = parseFloat(document.getElementById('calc-pack-partial').value) || 0;
-
-    let packWeight = parseFloat(packType);
-    if (isNaN(packWeight)) {
-      const customPrompt = prompt('Masukkan berat standar per kemasan (KG):', '25');
-      packWeight = parseFloat(customPrompt) || 25;
-    }
-
-    const calculatedTotal = (packQty * packWeight) + partialKg;
-    document.getElementById('input-actual-qty').value = calculatedTotal.toFixed(3);
-
-    // Auto set description note
-    const currentNote = document.getElementById('input-item-note').value;
-    if (!currentNote) {
-      document.getElementById('input-item-note').value = `${packQty} Kemasan (@${packWeight}kg)${partialKg > 0 ? ' + ' + partialKg + ' kg sisa' : ''}`;
-    }
   }
 
   saveCheckerItemInput() {
     if (!this.activeEditItem) return;
 
-    const actualVal = document.getElementById('input-actual-qty').value.trim();
-    if (actualVal === '') {
-      alert('Kuantitas fisik aktual harus diisi!');
+    const actualStr = document.getElementById('input-actual-qty').value.trim();
+    if (actualStr === '') {
+      alert('Total kuantitas fisik harus diisi!');
       return;
     }
 
-    const actualQty = parseFloat(actualVal);
+    const actualQty = parseFloat(actualStr);
+    const targetNet = this.activeEditItem.qtySap - (this.activeEditItem.pickingQty || 0);
     const isMisplaced = document.getElementById('check-is-misplaced').checked;
     const newBin = document.getElementById('input-new-bin').value.trim();
     const note = document.getElementById('input-item-note').value.trim();
-
-    const targetNet = this.activeEditItem.qtySap - (this.activeEditItem.pickingQty || 0);
 
     this.activeEditItem.actualQty = actualQty;
     this.activeEditItem.isMisplaced = isMisplaced;
@@ -752,50 +746,105 @@ class CycleCountApp {
     if (window.supabaseService) {
       window.supabaseService.syncItem(this.activeEditItem);
     }
-    document.getElementById('modal-checker-input').style.display = 'none';
 
+    document.getElementById('modal-checker-input').style.display = 'none';
+    this.renderActiveBinView();
     this.renderDashboard();
-    this.renderCheckerCards();
     this.renderPrintout();
   }
 
-  // ================= Official Printout (Berita Acara) Rendering =================
-  renderPrintout() {
-    const kpi = this.getKpiMetrics();
+  // ================= 6. DASHBOARD & REKONSILIASI RENDERING =================
+  renderDashboard() {
+    let total = this.items.length;
+    let matched = 0;
+    let diffCount = 0;
+    let misplacedCount = 0;
+    let netVariance = 0;
 
-    document.getElementById('print-doc-no').textContent = this.schedule.docNo;
-    document.getElementById('print-date').textContent = this.schedule.scheduleDate;
-    document.getElementById('print-spv').textContent = this.schedule.spvName;
-    document.getElementById('print-area').textContent = this.schedule.areaName;
+    this.items.forEach(item => {
+      const targetNet = item.qtySap - (item.pickingQty || 0);
+      if (item.actualQty !== null && item.actualQty !== undefined) {
+        const diff = item.actualQty - targetNet;
+        netVariance += diff;
+        if (Math.abs(diff) < 0.001) {
+          matched++;
+        } else {
+          diffCount++;
+        }
+      }
+      if (item.isMisplaced) misplacedCount++;
+    });
 
-    document.getElementById('print-sum-total').textContent = kpi.total;
-    document.getElementById('print-sum-matched').textContent = kpi.matched;
-    document.getElementById('print-sum-diff').textContent = kpi.discrepancy;
-    document.getElementById('print-sum-ira').textContent = `${kpi.iraRate}%`;
+    const iraRate = total > 0 ? ((matched / total) * 100).toFixed(1) : '0.0';
 
-    const tbody = document.getElementById('print-table-body');
+    document.getElementById('dash-ira-rate').textContent = `${iraRate}%`;
+    document.getElementById('dash-ira-summary').textContent = `${matched} Cocok dari ${total} Item (Target &ge; 98%)`;
+    document.getElementById('dash-diff-items').textContent = `${diffCount} Item`;
+    document.getElementById('dash-net-variance').textContent = `Net Selisih: ${(netVariance >= 0 ? '+' : '') + netVariance.toFixed(1)} KG`;
+    document.getElementById('dash-misplaced-items').textContent = `${misplacedCount} Item`;
+
+    // Render Master Table
+    const tbody = document.getElementById('dash-master-tbody');
     tbody.innerHTML = '';
 
     this.items.forEach((item, idx) => {
       const targetNet = item.qtySap - (item.pickingQty || 0);
       const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const variance = isCounted ? (item.actualQty - targetNet) : 0;
-      const isDiff = isCounted && Math.abs(variance) >= 0.001;
+      const diff = isCounted ? (item.actualQty - targetNet) : 0;
+      const isDiff = isCounted && Math.abs(diff) >= 0.001;
 
       const tr = document.createElement('tr');
-      if (isDiff) {
-        tr.classList.add('highlight-diff');
-      }
+      if (isDiff) tr.className = 'row-discrepancy';
+      if (item.isMisplaced) tr.className = 'row-misplaced';
 
-      let statusText = 'PENDING';
+      let statusBadge = '<span class="badge badge-pending">PENDING</span>';
       if (isCounted) {
-        statusText = isDiff ? 'SELISIH' : 'MATCH';
+        statusBadge = isDiff ? '<span class="badge badge-discrepancy">SELISIH</span>' : '<span class="badge badge-matched">COCOK</span>';
       }
+      if (item.isMisplaced) statusBadge += ` <span class="badge badge-misplaced">PINDAH</span>`;
 
-      let varText = '-';
-      if (isCounted) {
-        varText = (variance >= 0 ? '+' : '') + variance.toFixed(3);
-      }
+      tr.innerHTML = `
+        <td style="text-align: center;">${item.no || idx + 1}</td>
+        <td><span class="badge-bin">${item.bin}</span></td>
+        <td style="font-family: var(--font-mono);">${item.materialNumber}</td>
+        <td><strong>${item.materialDesc}</strong></td>
+        <td style="color:var(--brand-blue); font-weight:700; font-family:var(--font-mono);">${item.batchFisik}</td>
+        <td style="font-family: var(--font-mono);">${item.batchSap}</td>
+        <td style="text-align: right; font-family: var(--font-mono);">${item.qtySap.toFixed(2)}</td>
+        <td style="text-align: right; font-family: var(--font-mono);">${item.pickingQty.toFixed(2)}</td>
+        <td style="text-align: right; font-weight:700; font-family: var(--font-mono);">${targetNet.toFixed(2)}</td>
+        <td style="text-align: right; font-weight:800; font-family: var(--font-mono);">${isCounted ? item.actualQty.toFixed(2) : '-'}</td>
+        <td style="text-align: right; font-weight:800; color:${isDiff ? 'var(--status-diff)' : 'var(--status-match)'}; font-family: var(--font-mono);">
+          ${isCounted ? (diff >= 0 ? '+' : '') + diff.toFixed(2) : '-'}
+        </td>
+        <td style="text-align: center;">${statusBadge}</td>
+        <td style="font-size: 0.72rem;">${item.note || '-'}</td>
+        <td style="text-align: center;">
+          <button class="btn btn-secondary btn-sm" data-action="tbl-edit">Edit</button>
+        </td>
+      `;
+
+      tr.querySelector('[data-action="tbl-edit"]').addEventListener('click', () => {
+        this.openCheckerInputModal(item);
+      });
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ================= 7. OFFICIAL PRINTOUT RENDERING =================
+  renderPrintout() {
+    const tbody = document.getElementById('printout-tbody');
+    tbody.innerHTML = '';
+
+    this.items.forEach((item, idx) => {
+      const targetNet = item.qtySap - (item.pickingQty || 0);
+      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
+      const diff = isCounted ? (item.actualQty - targetNet) : 0;
+      const isDiff = isCounted && Math.abs(diff) >= 0.001;
+
+      const tr = document.createElement('tr');
+      if (isDiff) tr.className = 'highlight-diff';
 
       let remark = item.note || '-';
       if (item.isMisplaced && item.newBin) {
@@ -807,109 +856,97 @@ class CycleCountApp {
         <td><strong>${item.bin}</strong></td>
         <td>${item.materialNumber}</td>
         <td>${item.materialDesc}</td>
+        <td style="font-weight:700;">${item.batchFisik}</td>
         <td>${item.batchSap}</td>
-        <td style="font-weight: 600;">${item.batchFisik}</td>
-        <td>${item.expDate}</td>
-        <td style="text-align: center;">${item.uom}</td>
         <td style="text-align: right;">${item.qtySap.toFixed(2)}</td>
         <td style="text-align: right;">${item.pickingQty.toFixed(2)}</td>
-        <td style="text-align: right; font-weight: 700;">${targetNet.toFixed(2)}</td>
-        <td style="text-align: right; font-weight: 700;">${isCounted ? item.actualQty.toFixed(2) : '-'}</td>
-        <td style="text-align: right; font-weight: 700; color: ${isDiff ? '#b91c1c' : '#000000'};">${varText}</td>
-        <td style="text-align: center; font-weight: 700;">${statusText}</td>
-        <td style="font-size: 7pt;">${remark}</td>
+        <td style="text-align: right; font-weight:700;">${targetNet.toFixed(2)}</td>
+        <td style="text-align: right; font-weight:700;">${isCounted ? item.actualQty.toFixed(2) : '-'}</td>
+        <td style="text-align: right; font-weight:700; color:${isDiff ? '#dc2626' : '#000'};">
+          ${isCounted ? (diff >= 0 ? '+' : '') + diff.toFixed(2) : '-'}
+        </td>
+        <td style="text-align: center; font-weight:700;">${isCounted ? (isDiff ? 'SELISIH' : 'MATCH') : 'PENDING'}</td>
+        <td style="font-size: 7.5pt;">${remark}</td>
       `;
 
       tbody.appendChild(tr);
     });
   }
 
-  // ================= Filter Logic Helper =================
-  getFilteredItems(filterBin, filterStatus, query) {
-    return this.items.filter(item => {
-      // 1. Bin Filter
-      if (filterBin && filterBin !== 'ALL') {
-        if (!item.bin.startsWith(filterBin)) {
-          return false;
-        }
-      }
+  // ================= 8. EXPORT CSV & DEMO RESET =================
+  exportCsv() {
+    const headers = ['No', 'BIN', 'Kode Material', 'Deskripsi Material', 'Batch Fisik Vendor', 'Batch SAP', 'Qty SAP', 'Picking', 'Target Net', 'Aktual Fisik', 'Variance', 'Status', 'Catatan'];
+    const rows = this.items.map((item, idx) => {
+      const targetNet = item.qtySap - (item.pickingQty || 0);
+      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
+      const diff = isCounted ? (item.actualQty - targetNet) : '';
 
-      // 2. Status Filter
-      if (filterStatus && filterStatus !== 'ALL') {
-        const targetNet = item.qtySap - (item.pickingQty || 0);
-        const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-        const isDiff = isCounted && Math.abs(item.actualQty - targetNet) >= 0.001;
-
-        if (filterStatus === 'DISCREPANCY' && !isDiff) return false;
-        if (filterStatus === 'MATCHED' && (!isCounted || isDiff)) return false;
-        if (filterStatus === 'PENDING' && isCounted) return false;
-        if (filterStatus === 'MISPLACED' && !item.isMisplaced) return false;
-      }
-
-      // 3. Search Query
-      if (query) {
-        const targetStr = [
-          item.bin,
-          item.materialNumber,
-          item.materialDesc,
-          item.batchSap,
-          item.batchFisik,
-          item.note || ''
-        ].join(' ').toLowerCase();
-
-        if (!targetStr.includes(query)) {
-          return false;
-        }
-      }
-
-      return true;
+      return [
+        item.no || idx + 1,
+        `"${item.bin}"`,
+        `"${item.materialNumber}"`,
+        `"${item.materialDesc.replace(/"/g, '""')}"`,
+        `"${item.batchFisik}"`,
+        `"${item.batchSap}"`,
+        item.qtySap,
+        item.pickingQty,
+        targetNet,
+        isCounted ? item.actualQty : '',
+        diff,
+        item.status,
+        `"${(item.note || '').replace(/"/g, '""')}"`
+      ].join(',');
     });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Hasil_Cycle_Count_RMPM_${this.schedule.scheduleDate}.csv`;
+    link.click();
   }
 
-  // ================= Import SAP Data Handler =================
+  resetDemoData() {
+    if (confirm('Reset kembali ke 20 data asli dari lembar kertas?')) {
+      this.items = [...INITIAL_ITEMS];
+      this.calculateUniqueBins();
+      this.currentBinIndex = 0;
+      this.currentItemIndexInBin = 0;
+      this.saveItems();
+      this.renderActiveBinView();
+      this.renderDashboard();
+      this.renderPrintout();
+    }
+  }
+
   processSapImport() {
-    const rawText = document.getElementById('import-text-data').value.trim();
-    if (!rawText) {
-      alert('Silakan tempel (paste) data terlebih dahulu!');
+    const raw = document.getElementById('import-text-data').value.trim();
+    if (!raw) {
+      alert('Tempelkan data tabel terlebih dahulu!');
       return;
     }
 
-    const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const newItems = [];
 
-    lines.forEach((line, index) => {
-      // Split by tab or multiple spaces / comma
+    lines.forEach((line, idx) => {
       let cols = line.split('\t');
-      if (cols.length < 5) {
-        cols = line.split(/[\;,]/);
-      }
-
+      if (cols.length < 5) cols = line.split(/[\;,]/);
       if (cols.length >= 7) {
-        // Assume format: BIN, Material Number, Batch SAP, Batch Fisik, Exp Date, Material Description, UoM, Qty SAP, Picking Qty
-        const bin = cols[0] ? cols[0].trim() : `B.01A.${index + 1}`;
-        const matNum = cols[1] ? cols[1].trim() : '40000000';
-        const batchSap = cols[2] ? cols[2].trim() : '-';
-        const batchFisik = cols[3] ? cols[3].trim() : '-';
-        const expDate = cols[4] ? cols[4].trim() : '-';
-        const desc = cols[5] ? cols[5].trim() : 'MATERIAL RAW/PACKAGING';
-        const uom = cols[6] ? cols[6].trim().toUpperCase() : 'KG';
-        const qtySap = cols[7] ? parseFloat(cols[7].replace(/,/g, '')) || 0 : 0;
-        const pickQty = cols[8] ? parseFloat(cols[8].replace(/,/g, '')) || 0 : 0;
-
         newItems.push({
-          id: 'imported-' + Date.now() + '-' + index,
-          no: index + 1,
-          bin,
-          materialNumber: matNum,
-          batchSap,
-          batchFisik,
-          expDate,
-          materialDesc: desc,
-          uom,
-          qtySap,
-          pickingQty: pickQty,
+          id: 'imported-' + Date.now() + '-' + idx,
+          no: idx + 1,
+          bin: cols[0].trim(),
+          materialNumber: cols[1].trim(),
+          batchSap: cols[2].trim(),
+          batchFisik: cols[3].trim(),
+          expDate: cols[4].trim(),
+          materialDesc: cols[5].trim(),
+          uom: cols[6].trim().toUpperCase() || 'KG',
+          qtySap: parseFloat(cols[7].replace(/,/g, '')) || 0,
+          pickingQty: cols[8] ? parseFloat(cols[8].replace(/,/g, '')) || 0 : 0,
           actualQty: null,
-          unitConversion: '',
           note: '',
           isMisplaced: false,
           newBin: '',
@@ -920,99 +957,21 @@ class CycleCountApp {
       }
     });
 
-    if (newItems.length === 0) {
-      alert('Format data tidak sesuai. Pastikan kolom dipisahkan oleh Tab dari Excel.');
-      return;
-    }
-
-    if (confirm(`Berhasil membaca ${newItems.length} baris data SAP. Apakah Anda ingin mengganti jadwal aktif saat ini?`)) {
+    if (newItems.length > 0) {
       this.items = newItems;
+      this.calculateUniqueBins();
+      this.currentBinIndex = 0;
+      this.currentItemIndexInBin = 0;
       this.saveItems();
       document.getElementById('import-text-data').value = '';
-      alert('Data jadwal cycle count berhasil dimuat!');
-      this.switchView('view-dashboard');
-      this.renderCheckerBinPills();
-    }
-  }
-
-  // ================= Export to CSV =================
-  exportCsv() {
-    const headers = [
-      'No',
-      'BIN',
-      'Kode Material',
-      'Deskripsi Material',
-      'Batch SAP',
-      'Batch Fisik',
-      'Exp Date',
-      'UoM',
-      'Qty Base On SAP',
-      'Picking Qty',
-      'Target Net Qty',
-      'Fisik Aktual',
-      'Variance',
-      'Status',
-      'Catatan',
-      'Pindah Lokasi',
-      'Petugas Hitung',
-      'Waktu Hitung'
-    ];
-
-    const rows = this.items.map((item, idx) => {
-      const targetNet = item.qtySap - (item.pickingQty || 0);
-      const isCounted = item.actualQty !== null && item.actualQty !== undefined;
-      const variance = isCounted ? (item.actualQty - targetNet) : '';
-
-      return [
-        item.no || idx + 1,
-        `"${item.bin}"`,
-        `"${item.materialNumber}"`,
-        `"${item.materialDesc.replace(/"/g, '""')}"`,
-        `"${item.batchSap}"`,
-        `"${item.batchFisik}"`,
-        `"${item.expDate}"`,
-        item.uom,
-        item.qtySap,
-        item.pickingQty,
-        targetNet,
-        isCounted ? item.actualQty : '',
-        variance,
-        item.status,
-        `"${(item.note || '').replace(/"/g, '""')}"`,
-        `"${item.isMisplaced ? item.newBin : ''}"`,
-        `"${item.countedBy || ''}"`,
-        `"${item.countedAt || ''}"`
-      ].join(',');
-    });
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Hasil_Cycle_Count_RMPM_${this.schedule.scheduleDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  // ================= Reset Data Demo =================
-  resetDemoData() {
-    if (confirm('Apakah Anda yakin ingin mereset data kembali ke contoh formulir fisik awal?')) {
-      this.items = [...INITIAL_ITEMS];
-      this.schedule = { ...INITIAL_SCHEDULE };
-      this.saveItems();
-      this.saveSchedule();
-      this.renderDashboard();
-      this.renderCheckerBinPills();
-      this.renderCheckerCards();
-      this.renderPrintout();
-      alert('Data telah direset ke contoh lembar fisik awal.');
+      alert(`Berhasil mengimpor ${newItems.length} baris jadwal!`);
+      this.switchView('view-checker');
+    } else {
+      alert('Format kolom tidak terbaca. Pastikan dipisahkan oleh Tab dari Excel.');
     }
   }
 }
 
-// Initialize Application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   window.app = new CycleCountApp();
 });
