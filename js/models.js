@@ -420,6 +420,35 @@ class CycleCountRepository {
     return itemObj;
   }
 
+  updateItem(itemId, fields = {}) {
+    const item = this.items.find(i => i.id === itemId);
+    if (!item) return null;
+    if (fields.bin !== undefined) item.bin = fields.bin.trim();
+    if (fields.materialNumber !== undefined) item.materialNumber = fields.materialNumber.trim();
+    if (fields.materialDesc !== undefined) item.materialDesc = fields.materialDesc.trim();
+    if (fields.batchSap !== undefined) item.batchSap = fields.batchSap.trim();
+    if (fields.batchFisik !== undefined) item.batchFisik = fields.batchFisik.trim();
+    if (fields.qtySap !== undefined) item.qtySap = parseFloat(fields.qtySap) || 0;
+    if (fields.pickingQty !== undefined) item.pickingQty = parseFloat(fields.pickingQty) || 0;
+    if (fields.uom !== undefined) item.uom = fields.uom.trim().toUpperCase();
+    if (fields.expDate !== undefined) item.expDate = fields.expDate.trim();
+    item.updatedAt = new Date().toISOString();
+    this.saveItems();
+    return item;
+  }
+
+  deleteItem(itemId) {
+    const idx = this.items.findIndex(i => i.id === itemId);
+    if (idx === -1) return false;
+    this.items.splice(idx, 1);
+    // Re-index line numbers
+    this.items.forEach((item, index) => {
+      item.no = index + 1;
+    });
+    this.saveItems();
+    return true;
+  }
+
   resetDemoData() {
     this.items = INITIAL_ITEMS.map(i => CycleCountItem.fromJSON(i));
     this.signatureMatrix = SignatureMatrix.createDefault();

@@ -578,9 +578,42 @@
               </button>
             </div>
 
+            <!-- Interactive Master SKU Management List / CRUD Table -->
+            <div style="border-top: 1px solid var(--border-main); padding-top: 1rem; margin-top: 0.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-list-check" style="color: var(--brand-primary);"></i>
+                  <span>Daftar Master SKU Material (CRUD Aktif)</span>
+                </div>
+                <div style="max-width: 280px; width: 100%;">
+                  <input type="text" id="settings-sku-search" class="app-input" style="height: 34px; font-size: 0.78rem;" placeholder="Cari BIN / Kode / Deskripsi...">
+                </div>
+              </div>
+
+              <!-- Table Container -->
+              <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-main); border-radius: var(--radius-sm); background: var(--surface-card);">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: left;" id="settings-sku-table">
+                  <thead style="position: sticky; top: 0; background: var(--surface-subtle); border-bottom: 1px solid var(--border-main); z-index: 2;">
+                    <tr>
+                      <th style="padding: 0.5rem 0.65rem; width: 40px; text-align: center;">No</th>
+                      <th style="padding: 0.5rem 0.65rem; width: 100px;">Rak BIN</th>
+                      <th style="padding: 0.5rem 0.65rem; width: 95px;">Kode SKU</th>
+                      <th style="padding: 0.5rem 0.65rem;">Deskripsi Material</th>
+                      <th style="padding: 0.5rem 0.65rem; width: 110px;">Batch SAP</th>
+                      <th style="padding: 0.5rem 0.65rem; text-align: right; width: 95px;">Qty SAP</th>
+                      <th style="padding: 0.5rem 0.65rem; text-align: center; width: 110px;">Aksi CRUD</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settings-sku-tbody">
+                    <!-- Populated dynamically by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.4;">
               <i class="fa-solid fa-circle-info" style="color: var(--brand-primary); margin-right: 0.25rem;"></i>
-              <strong>Catatan:</strong> Mengosongkan data dummy akan membersihkan tabel sehingga siap dipakai untuk import file aktual dari SAP ALV Grid atau input manual. Seluruh data tersimpan otomatis di penyimpanan lokal &amp; tersinkronisasi ke cloud.
+              <strong>Catatan:</strong> Seluruh penambahan, pengubahan (edit), dan penghapusan item SKU langsung tersimpan di penyimpanan lokal dan tersinkronisasi otomatis ke Supabase Cloud secara real-time.
             </div>
           </div>
         </div>
@@ -903,6 +936,77 @@
         <button class="btn-core btn-primary" id="btn-submit-add-item">
           <i class="fa-solid fa-floppy-disk"></i>
           <span>Simpan Item</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL EDIT SKU MASTER ================= -->
+  <div class="modal-overlay" id="modal-edit-item" style="display: none;">
+    <div class="modal-dialog" style="max-width: 500px;">
+      <div class="modal-head">
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">
+          <i class="fa-solid fa-pen-to-square" style="color: var(--brand-primary); margin-right: 0.4rem;"></i>
+          Edit Master SKU Material
+        </h3>
+        <button class="btn-core btn-secondary btn-sm" data-close="modal-edit-item">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form id="form-edit-item" class="modal-body" style="gap: 0.85rem;" onsubmit="return false;">
+        <input type="hidden" id="edit-item-id">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+          <div class="form-group">
+            <label class="form-label">Alamat Rak / BIN *</label>
+            <input type="text" id="edit-item-bin" class="app-input font-mono" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kode Material SAP *</label>
+            <input type="text" id="edit-item-code" class="app-input font-mono" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Deskripsi Material *</label>
+          <input type="text" id="edit-item-desc" class="app-input" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+          <div class="form-group">
+            <label class="form-label">Batch SAP *</label>
+            <input type="text" id="edit-item-batch-sap" class="app-input font-mono" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Batch Fisik</label>
+            <input type="text" id="edit-item-batch-fisik" class="app-input font-mono">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.65rem;">
+          <div class="form-group">
+            <label class="form-label">Qty SAP (KG) *</label>
+            <input type="number" step="0.01" id="edit-item-qty-sap" class="app-input font-mono" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Picking (KG)</label>
+            <input type="number" step="0.01" id="edit-item-qty-picking" class="app-input font-mono" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Satuan</label>
+            <input type="text" id="edit-item-uom" class="app-input font-mono" value="KG">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Expire Date (YYYY-MM-DD)</label>
+          <input type="date" id="edit-item-exp" class="app-input font-mono">
+        </div>
+      </form>
+      <div class="modal-foot">
+        <button class="btn-core btn-secondary" data-close="modal-edit-item">Batal</button>
+        <button class="btn-core btn-primary" id="btn-submit-edit-item">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Simpan Perubahan</span>
         </button>
       </div>
     </div>

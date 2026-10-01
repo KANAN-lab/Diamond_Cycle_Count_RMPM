@@ -105,12 +105,199 @@ class SupabaseService {
       }
       return [];
     } catch (err) {
-      console.warn('[Supabase] Exception fetching items:', err);
+      console.warn('[Supabase Cloud] Exception fetching items:', err);
       return null;
     }
   }
 
-  // Save / update single item to Supabase
+  // Fetch system settings from Supabase cc_settings
+  async fetchSettings() {
+    if (!this.isConnected || !this.client) return null;
+    try {
+      const { data, error } = await this.client
+        .from('cc_settings')
+        .select('*')
+        .eq('id', 'default_settings')
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[Supabase Cloud] Error fetching settings:', error);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.warn('[Supabase Cloud] Exception fetching settings:', err);
+      return null;
+    }
+  }
+
+  // Create single new item in Supabase cc_items
+  async createItem(item) {
+    if (!this.isConnected || !this.client) return { success: false, reason: 'offline' };
+    try {
+      const payload = {
+        id: item.id,
+        schedule_id: item.scheduleId || 'sched-2026-09-21-01',
+        no: item.no || 1,
+        bin: item.bin,
+        material_number: item.materialNumber,
+        material_desc: item.materialDesc,
+        batch_sap: item.batchSap,
+        batch_fisik: item.batchFisik || item.batchSap,
+        exp_date: item.expDate || null,
+        uom: item.uom || 'KG',
+        qty_sap: item.qtySap || 0,
+        picking_qty: item.pickingQty || 0,
+        actual_qty: item.actualQty !== null && item.actualQty !== undefined ? item.actualQty : null,
+        unit_conversion: item.unitConversion || null,
+        note: item.note || null,
+        is_misplaced: Boolean(item.isMisplaced),
+        new_bin: item.newBin || null,
+        status: item.status || 'PENDING',
+        counted_by: item.countedBy || null,
+        counted_at: item.countedAt ? new Date(item.countedAt).toISOString() : null,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await this.client
+        .from('cc_items')
+        .insert(payload)
+        .select();
+
+      if (error) {
+        console.warn('[Supabase Cloud] Create item failed:', error);
+        return { success: false, error };
+      }
+      console.log('[Supabase Cloud] Item created successfully:', item.id);
+      return { success: true, data };
+    } catch (err) {
+      console.warn('[Supabase Cloud] Exception creating item:', err);
+      return { success: false, error: err };
+    }
+  }
+
+  // Update item master data in Supabase cc_items
+  async updateItemMaster(item) {
+    if (!this.isConnected || !this.client) return { success: false, reason: 'offline' };
+    try {
+      const payload = {
+        bin: item.bin,
+        material_number: item.materialNumber,
+        material_desc: item.materialDesc,
+        batch_sap: item.batchSap,
+        batch_fisik: item.batchFisik || item.batchSap,
+        exp_date: item.expDate || null,
+        qty_sap: item.qtySap || 0,
+        picking_qty: item.pickingQty || 0,
+        uom: item.uom || 'KG',
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await this.client
+        .from('cc_items')
+        .update(payload)
+        .eq('id', item.id)
+        .select();
+
+      if (error) {
+        console.warn('[Supabase Cloud] Update item master failed:', error);
+        return { success: false, error };
+      }
+      console.log('[Supabase Cloud] Item master updated successfully:', item.id);
+      return { success: true, data };
+    } catch (err) {
+      console.warn('[Supabase Cloud] Exception updating item master:', err);
+      return { success: false, error: err };
+    }
+  }
+
+  // Delete single item from Supabase cc_items
+  async deleteItem(itemId) {
+    if (!this.isConnected || !this.client) return { success: false, reason: 'offline' };
+    try {
+      const { error } = await this.client
+        .from('cc_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) {
+        console.warn('[Supabase Cloud] Delete item failed:', error);
+        return { success: false, error };
+      }
+      console.log('[Supabase Cloud] Item deleted successfully:', itemId);
+      return { success: true };
+    } catch (err) {
+      console.warn('[Supabase Cloud] Exception deleting item:', err);
+      return { success: false, error: err };
+    }
+  }
+
+  // Clear all items from Supabase cc_items
+  async clearAllItems() {
+    if (!this.isConnected || !this.client) return { success: false, reason: 'offline' };
+    try {
+      const { error } = await this.client
+        .from('cc_items')
+        .delete()
+        .neq('id', '___NEVER_MATCH___');
+
+      if (error) {
+        console.warn('[Supabase Cloud] Clear all items failed:', error);
+        return { success: false, error };
+      }
+      console.log('[Supabase Cloud] All items cleared successfully');
+      return { success: true };
+    } catch (err) {
+      console.warn('[Supabase Cloud] Exception clearing all items:', err);
+      return { success: false, error: err };
+    }
+  }
+
+  // Bulk upsert items into Supabase cc_items
+  async bulkUpsertItems(items) {
+    if (!this.isConnected || !this.client || !items || items.length === 0) return { success: false };
+    try {
+      const payloads = items.map(item => ({
+        id: item.id,
+        schedule_id: item.scheduleId || 'sched-2026-09-21-01',
+        no: item.no,
+        bin: item.bin,
+        material_number: item.materialNumber,
+        material_desc: item.materialDesc,
+        batch_sap: item.batchSap,
+        batch_fisik: item.batchFisik || item.batchSap,
+        exp_date: item.expDate || null,
+        uom: item.uom || 'KG',
+        qty_sap: item.qtySap || 0,
+        picking_qty: item.pickingQty || 0,
+        actual_qty: item.actualQty !== null && item.actualQty !== undefined ? item.actualQty : null,
+        unit_conversion: item.unitConversion || null,
+        note: item.note || null,
+        is_misplaced: Boolean(item.isMisplaced),
+        new_bin: item.newBin || null,
+        status: item.status || 'PENDING',
+        counted_by: item.countedBy || null,
+        counted_at: item.countedAt ? new Date(item.countedAt).toISOString() : null,
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await this.client
+        .from('cc_items')
+        .upsert(payloads, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('[Supabase Cloud] Bulk upsert items failed:', error);
+        return { success: false, error };
+      }
+      console.log('[Supabase Cloud] Bulk upsert items succeeded:', payloads.length, 'records');
+      return { success: true };
+    } catch (err) {
+      console.warn('[Supabase Cloud] Exception bulk upserting items:', err);
+      return { success: false, error: err };
+    }
+  }
+
+  // Save / update single item physical count result
   async syncItem(item) {
     if (!this.isConnected || !this.client) return;
 
@@ -133,18 +320,18 @@ class SupabaseService {
         .eq('id', item.id);
 
       if (error) {
-        console.warn('[Supabase] Sync item failed:', error);
+        console.warn('[Supabase Cloud] Sync item failed:', error);
       } else {
-        console.log('[Supabase] Item synced successfully:', item.id);
+        console.log('[Supabase Cloud] Item synced successfully:', item.id);
       }
     } catch (err) {
-      console.warn('[Supabase] Error syncing item:', err);
+      console.warn('[Supabase Cloud] Error syncing item:', err);
     }
   }
 
-  // Save / update system settings to Supabase
+  // Save / update system settings to Supabase cc_settings
   async syncSettings(sigMatrix, companyProfile, updatedBy = 'ADMIN') {
-    if (!this.isConnected || !this.client) return;
+    if (!this.isConnected || !this.client) return { success: false, reason: 'offline' };
 
     try {
       const payload = {
@@ -166,17 +353,33 @@ class SupabaseService {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await this.client
+      // Try update first (primary row exists)
+      const { data: updateData, error: updateError } = await this.client
         .from('cc_settings')
-        .upsert(payload, { onConflict: 'id' });
+        .update(payload)
+        .eq('id', 'default_settings')
+        .select();
 
-      if (error) {
-        console.warn('[Supabase] Sync settings failed:', error);
-      } else {
-        console.log('[Supabase] Settings synced successfully');
+      if (!updateError && updateData && updateData.length > 0) {
+        console.log('[Supabase Cloud] Settings updated successfully');
+        return { success: true };
       }
+
+      // If not exists yet, insert
+      const { error: insertError } = await this.client
+        .from('cc_settings')
+        .insert(payload);
+
+      if (insertError) {
+        console.warn('[Supabase Cloud] Sync settings failed:', insertError);
+        return { success: false, error: insertError };
+      }
+
+      console.log('[Supabase Cloud] Settings inserted successfully');
+      return { success: true };
     } catch (err) {
-      console.warn('[Supabase] Error syncing settings:', err);
+      console.warn('[Supabase Cloud] Error syncing settings:', err);
+      return { success: false, error: err };
     }
   }
 

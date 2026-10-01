@@ -541,6 +541,16 @@ class CycleCountApp {
       submitAddItemBtn.addEventListener('click', () => this.handleAddNewItem());
     }
 
+    const skuSearchInput = document.getElementById('settings-sku-search');
+    if (skuSearchInput) {
+      skuSearchInput.addEventListener('input', () => this.renderSettingsSkuTable());
+    }
+
+    const submitEditItemBtn = document.getElementById('btn-submit-edit-item');
+    if (submitEditItemBtn) {
+      submitEditItemBtn.addEventListener('click', () => this.handleSaveEditItem());
+    }
+
     // 16. Packaging Converter Steppers in Modal
     this.bindPackagingModalEvents();
 
@@ -719,6 +729,8 @@ class CycleCountApp {
       this.renderPrintout();
     } else if (viewId === 'view-settings') {
       this.loadAdminSettingsForm();
+      this.updateSettingsDataInfo();
+      this.renderSettingsSkuTable();
     }
   }
 
@@ -748,6 +760,46 @@ class CycleCountApp {
 
   async initSupabaseSync() {
     try {
+      // 1. Sync Settings from Cloud cc_settings
+      const cloudSettings = await window.supabaseService.fetchSettings();
+      if (cloudSettings) {
+        this.companyProfile.update({
+          companyName: cloudSettings.company_name,
+          divisionName: cloudSettings.division_name,
+          departmentName: cloudSettings.department_name,
+          docNumber: cloudSettings.doc_number_format,
+          iraTargetPercent: cloudSettings.ira_target_percent
+        });
+        if (cloudSettings.sig_checker_name) {
+          this.signatureMatrix.updateOfficer('checker', {
+            name: cloudSettings.sig_checker_name,
+            position: cloudSettings.sig_checker_position
+          });
+        }
+        if (cloudSettings.sig_spv_name) {
+          this.signatureMatrix.updateOfficer('supervisor', {
+            name: cloudSettings.sig_spv_name,
+            position: cloudSettings.sig_spv_position
+          });
+        }
+        if (cloudSettings.sig_controller_name) {
+          this.signatureMatrix.updateOfficer('controller', {
+            name: cloudSettings.sig_controller_name,
+            position: cloudSettings.sig_controller_position
+          });
+        }
+        if (cloudSettings.sig_accounting_name) {
+          this.signatureMatrix.updateOfficer('accounting', {
+            name: cloudSettings.sig_accounting_name,
+            position: cloudSettings.sig_accounting_position
+          });
+        }
+        this.repo.saveCompany();
+        this.repo.saveSignatures();
+        this.loadAdminSettingsForm();
+      }
+
+      // 2. Sync Items from Cloud cc_items
       const cloudItems = await window.supabaseService.fetchItems();
       if (cloudItems && cloudItems.length > 0) {
         this.items = cloudItems.map(i => CycleCountItem.fromJSON(i));
@@ -757,8 +809,11 @@ class CycleCountApp {
         this.renderActiveBinView();
         this.renderDashboard();
         this.renderPrintout();
+        this.updateSettingsDataInfo();
+        this.renderSettingsSkuTable();
       }
 
+      // 3. Realtime Subscription
       window.supabaseService.subscribeToChanges((payload) => {
         if (payload.new && payload.new.id) {
           const idx = this.items.findIndex(i => i.id === payload.new.id);
@@ -774,6 +829,7 @@ class CycleCountApp {
             this.renderActiveBinView();
             this.renderDashboard();
             this.renderPrintout();
+            this.renderSettingsSkuTable();
           }
         }
       });
@@ -834,7 +890,7 @@ class CycleCountApp {
     }
   }
 
-  saveAdminSettings() {
+  async saveAdminSettings() {
     if (!this.auth.isAdmin()) return;
 
     // Update Signatures
@@ -872,19 +928,36 @@ class CycleCountApp {
       iraTargetPercent: parseFloat(document.getElementById('cfg-ira-target').value) || 98.0
     });
 
-    // Save to repository
+    // Save to local repository
     this.repo.saveSignatures();
     this.repo.saveCompany();
 
-    // Update Printout and Dashboard View
+    // Update Printout, Dashboard View, and Settings info
     this.renderPrintout();
     this.renderDashboard();
     this.updateSettingsDataInfo();
 
+    // Sync to Supabase Cloud cc_settings
+    let cloudSynced = false;
+    if (window.supabaseService && window.supabaseService.isConnected) {
+      const res = await window.supabaseService.syncSettings(
+        this.signatureMatrix,
+        this.companyProfile,
+        this.auth.currentUser ? this.auth.currentUser.name : 'ADMIN'
+      );
+      cloudSynced = res && res.success;
+    }
+
     Swal.fire({
       icon: 'success',
       title: 'Pengaturan Disimpan',
-      text: 'Kustomisasi tanda tangan (TTD) dan standar audit telah diperbarui di Berita Acara.',
+      html: `
+        <div>Kustomisasi tanda tangan (TTD) dan standar audit telah diperbarui.</div>
+        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: ${cloudSynced ? 'var(--brand-primary)' : 'var(--text-muted)'}; font-weight: 700;">
+          <i class="fa-solid ${cloudSynced ? 'fa-cloud-arrow-up' : 'fa-hard-drive'}"></i>
+          ${cloudSynced ? 'Tersinkronisasi ke Supabase Cloud (zaxrouzuwryymdolhlix)' : 'Tersimpan di Penyimpanan Lokal (Offline)'}
+        </div>
+      `,
       customClass: { popup: 'swal-custom-popup' }
     });
   }
@@ -914,34 +987,49 @@ class CycleCountApp {
     });
 
     totalEl.textContent = `${total} SKU Material`;
-    summaryEl.textContent = `${matched} Cocok \u2022 ${diff} Selisih \u2022 Total SAP: ${totalSap.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
+    summaryEl.textContent = `${matched} Cocok • ${diff} Selisih • Total SAP: ${totalSap.toLocaleString('id-ID', { minimumFractionDigits: 2 })} KG`;
   }
 
   clearDummyData() {
     Swal.fire({
       title: 'Kosongkan Seluruh Data?',
-      text: 'Semua item SKU dummy akan dihapus (0 item). Tabel akan bersih untuk memulai input data aktual.',
+      text: 'Semua item SKU dummy akan dihapus (0 item) baik di penyimpanan lokal maupun di database cloud.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Ya, Kosongkan',
       cancelButtonText: 'Batal',
       confirmButtonColor: '#dc2626',
       customClass: { popup: 'swal-custom-popup' }
-    }).then(result => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
+        // Clear local repository
         this.repo.clearAllItems();
         this.items = this.repo.items;
+
+        // Clear Supabase Cloud
+        let cloudCleared = false;
+        if (window.supabaseService && window.supabaseService.isConnected) {
+          const res = await window.supabaseService.clearAllItems();
+          cloudCleared = res && res.success;
+        }
+
         this.calculateUniqueBins();
         this.renderDashboard();
         this.renderActiveBinView();
         this.renderPrintout();
         this.updateSettingsDataInfo();
+        this.renderSettingsSkuTable();
 
         Swal.fire({
           icon: 'success',
           title: 'Data Dikosongkan',
-          text: 'Seluruh data dummy berhasil dihapus (0 SKU). Anda dapat menambah item manual atau melakukan import SAP.',
-          timer: 1600,
+          html: `
+            <div>Seluruh data dummy berhasil dihapus (0 SKU).</div>
+            <div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--brand-primary); font-weight: 700;">
+              ${cloudCleared ? '<i class="fa-solid fa-cloud"></i> Sinkronisasi cloud berhasil: tabel cc_items telah dikosongkan.' : '<i class="fa-solid fa-hard-drive"></i> Data lokal berhasil dikosongkan.'}
+            </div>
+          `,
+          timer: 1800,
           showConfirmButton: false,
           customClass: { popup: 'swal-custom-popup' }
         });
@@ -952,28 +1040,41 @@ class CycleCountApp {
   loadDefaultDummyData() {
     Swal.fire({
       title: 'Set / Muat 20 Data Dummy SAP?',
-      text: 'Data saat ini akan digantikan dengan 20 item dummy SAP standar (termasuk 4 studi kasus: normal, selisih kurang, salah BIN, selisih lebih).',
+      text: 'Data akan digantikan dengan 20 item dummy SAP standar (termasuk 4 studi kasus: normal, selisih kurang, salah BIN, selisih lebih) dan disinkronkan ke Supabase Cloud.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: '<i class="fa-solid fa-rotate-left"></i> Ya, Muat Dummy',
       cancelButtonText: 'Batal',
       confirmButtonColor: '#10b981',
       customClass: { popup: 'swal-custom-popup' }
-    }).then(result => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
         this.repo.loadDummyData();
         this.items = this.repo.items;
+
+        let cloudSynced = false;
+        if (window.supabaseService && window.supabaseService.isConnected) {
+          const res = await window.supabaseService.bulkUpsertItems(this.items);
+          cloudSynced = res && res.success;
+        }
+
         this.calculateUniqueBins();
         this.renderDashboard();
         this.renderActiveBinView();
         this.renderPrintout();
         this.updateSettingsDataInfo();
+        this.renderSettingsSkuTable();
 
         Swal.fire({
           icon: 'success',
           title: 'Data Dummy Siap',
-          text: '20 data dummy SAP standar berhasil dimuat ke sistem.',
-          timer: 1500,
+          html: `
+            <div>20 data dummy SAP standar berhasil dimuat ke sistem.</div>
+            <div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--brand-primary); font-weight: 700;">
+              ${cloudSynced ? '<i class="fa-solid fa-cloud"></i> 20 SKU berhasil disinkronkan ke Supabase Cloud (cc_items).' : '<i class="fa-solid fa-hard-drive"></i> Dimuat ke penyimpanan lokal browser.'}
+            </div>
+          `,
+          timer: 1800,
           showConfirmButton: false,
           customClass: { popup: 'swal-custom-popup' }
         });
@@ -981,7 +1082,7 @@ class CycleCountApp {
     });
   }
 
-  handleAddNewItem() {
+  async handleAddNewItem() {
     const bin = document.getElementById('add-item-bin').value.trim();
     const matCode = document.getElementById('add-item-code').value.trim();
     const matDesc = document.getElementById('add-item-desc').value.trim();
@@ -1018,11 +1119,19 @@ class CycleCountApp {
 
     this.repo.addItem(newItem);
     this.items = this.repo.items;
+
+    let cloudSaved = false;
+    if (window.supabaseService && window.supabaseService.isConnected) {
+      const res = await window.supabaseService.createItem(newItem);
+      cloudSaved = res && res.success;
+    }
+
     this.calculateUniqueBins();
     this.renderDashboard();
     this.renderActiveBinView();
     this.renderPrintout();
     this.updateSettingsDataInfo();
+    this.renderSettingsSkuTable();
 
     // Reset Form & Close Modal
     const form = document.getElementById('form-add-item');
@@ -1032,10 +1141,201 @@ class CycleCountApp {
     Swal.fire({
       icon: 'success',
       title: 'Item Ditambahkan',
-      text: `Material ${matCode} (${matDesc}) berhasil ditambahkan ke rak ${bin}.`,
+      html: `
+        <div>Material <strong>${matCode}</strong> (${matDesc}) berhasil ditambahkan ke rak <code>${bin}</code>.</div>
+        <div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--brand-primary); font-weight: 700;">
+          ${cloudSaved ? '<i class="fa-solid fa-cloud"></i> Tersimpan di Supabase Cloud & Lokal.' : '<i class="fa-solid fa-hard-drive"></i> Tersimpan di penyimpanan lokal.'}
+        </div>
+      `,
+      timer: 1800,
+      showConfirmButton: false,
+      customClass: { popup: 'swal-custom-popup' }
+    });
+  }
+
+  openEditItemModal(item) {
+    if (!item) return;
+    document.getElementById('edit-item-id').value = item.id;
+    document.getElementById('edit-item-bin').value = item.bin;
+    document.getElementById('edit-item-code').value = item.materialNumber;
+    document.getElementById('edit-item-desc').value = item.materialDesc;
+    document.getElementById('edit-item-batch-sap').value = item.batchSap;
+    document.getElementById('edit-item-batch-fisik').value = item.batchFisik || item.batchSap;
+    document.getElementById('edit-item-qty-sap').value = item.qtySap;
+    document.getElementById('edit-item-qty-picking').value = item.pickingQty || 0;
+    document.getElementById('edit-item-uom').value = item.uom || 'KG';
+    document.getElementById('edit-item-exp').value = item.expDate || '';
+
+    document.getElementById('modal-edit-item').style.display = 'flex';
+  }
+
+  async handleSaveEditItem() {
+    const itemId = document.getElementById('edit-item-id').value;
+    const bin = document.getElementById('edit-item-bin').value.trim();
+    const matCode = document.getElementById('edit-item-code').value.trim();
+    const matDesc = document.getElementById('edit-item-desc').value.trim();
+    const batchSap = document.getElementById('edit-item-batch-sap').value.trim();
+    const batchFisik = document.getElementById('edit-item-batch-fisik').value.trim() || batchSap;
+    const qtySap = parseFloat(document.getElementById('edit-item-qty-sap').value);
+    const picking = parseFloat(document.getElementById('edit-item-qty-picking').value) || 0;
+    const uom = document.getElementById('edit-item-uom').value.trim() || 'KG';
+    const expDate = document.getElementById('edit-item-exp').value.trim() || '';
+
+    if (!itemId || !bin || !matCode || !matDesc || !batchSap || isNaN(qtySap)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Data Belum Lengkap',
+        text: 'Mohon lengkapi alamat BIN, Kode Material, Deskripsi, Batch SAP, dan Qty SAP.',
+        customClass: { popup: 'swal-custom-popup' }
+      });
+      return;
+    }
+
+    const updatedItem = this.repo.updateItem(itemId, {
+      bin,
+      materialNumber: matCode,
+      materialDesc: matDesc,
+      batchSap,
+      batchFisik,
+      qtySap,
+      pickingQty: picking,
+      uom,
+      expDate
+    });
+
+    this.items = this.repo.items;
+
+    let cloudUpdated = false;
+    if (window.supabaseService && window.supabaseService.isConnected && updatedItem) {
+      const res = await window.supabaseService.updateItemMaster(updatedItem);
+      cloudUpdated = res && res.success;
+    }
+
+    this.calculateUniqueBins();
+    this.renderDashboard();
+    this.renderActiveBinView();
+    this.renderPrintout();
+    this.updateSettingsDataInfo();
+    this.renderSettingsSkuTable();
+
+    document.getElementById('modal-edit-item').style.display = 'none';
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Perubahan Disimpan',
+      html: `
+        <div>Data material <strong>${matCode}</strong> berhasil diperbarui.</div>
+        <div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--brand-primary); font-weight: 700;">
+          ${cloudUpdated ? '<i class="fa-solid fa-cloud"></i> Terupdate di Supabase Cloud & Lokal.' : '<i class="fa-solid fa-hard-drive"></i> Terupdate di penyimpanan lokal.'}
+        </div>
+      `,
       timer: 1600,
       showConfirmButton: false,
       customClass: { popup: 'swal-custom-popup' }
+    });
+  }
+
+  handleDeleteItem(itemId) {
+    const item = this.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    Swal.fire({
+      title: 'Hapus SKU Ini?',
+      html: `Apakah Anda yakin ingin menghapus material <strong>${item.materialNumber}</strong> (${item.materialDesc}) di rak <code>${item.bin}</code>?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Ya, Hapus',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#dc2626',
+      customClass: { popup: 'swal-custom-popup' }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        this.repo.deleteItem(itemId);
+        this.items = this.repo.items;
+
+        let cloudDeleted = false;
+        if (window.supabaseService && window.supabaseService.isConnected) {
+          const res = await window.supabaseService.deleteItem(itemId);
+          cloudDeleted = res && res.success;
+        }
+
+        this.calculateUniqueBins();
+        this.renderDashboard();
+        this.renderActiveBinView();
+        this.renderPrintout();
+        this.updateSettingsDataInfo();
+        this.renderSettingsSkuTable();
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Item Dihapus',
+          text: `Item berhasil dihapus dari sistem.${cloudDeleted ? ' (Tersinkronisasi ke Cloud)' : ''}`,
+          timer: 1500,
+          showConfirmButton: false,
+          customClass: { popup: 'swal-custom-popup' }
+        });
+      }
+    });
+  }
+
+  renderSettingsSkuTable() {
+    const tbody = document.getElementById('settings-sku-tbody');
+    if (!tbody) return;
+
+    const searchInput = document.getElementById('settings-sku-search');
+    const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    const list = this.items.filter(item => {
+      if (!q) return true;
+      const str = `${item.bin} ${item.materialNumber} ${item.materialDesc} ${item.batchSap}`.toLowerCase();
+      return str.includes(q);
+    });
+
+    tbody.innerHTML = '';
+
+    if (list.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td colspan="7" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+          <i class="fa-solid fa-box-open" style="font-size: 1.5rem; margin-bottom: 0.4rem; display: block;"></i>
+          ${this.items.length === 0 ? 'Dataset kosong (0 SKU). Silakan klik "Tambah SKU Baru" atau "Set / Muat 20 Data Dummy SAP".' : 'Tidak ada SKU yang cocok dengan pencarian "' + q + '".'}
+        </td>
+      `;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    list.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid var(--border-subtle)';
+      tr.innerHTML = `
+        <td style="text-align: center; color: var(--text-muted); font-family: var(--font-mono); padding: 0.45rem 0.65rem;">${item.no || idx + 1}</td>
+        <td style="padding: 0.45rem 0.65rem;"><span class="badge-bin" style="font-size: 0.72rem;">${item.bin}</span></td>
+        <td class="font-mono" style="color: var(--text-secondary); padding: 0.45rem 0.65rem;">${item.materialNumber}</td>
+        <td style="padding: 0.45rem 0.65rem;">
+          <div style="font-weight: 700; color: var(--text-main); font-size: 0.76rem;">${item.materialDesc}</div>
+        </td>
+        <td class="font-mono" style="color: var(--text-muted); padding: 0.45rem 0.65rem; font-size: 0.74rem;">${item.batchSap}</td>
+        <td style="text-align: right; font-weight: 800; font-family: var(--font-mono); padding: 0.45rem 0.65rem;">${item.qtySap.toLocaleString('id-ID', { minimumFractionDigits: 2 })} ${item.uom}</td>
+        <td style="text-align: center; padding: 0.45rem 0.65rem; white-space: nowrap;">
+          <button class="btn-core btn-secondary btn-sm" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; margin-right: 0.25rem;" data-action="edit-sku" data-id="${item.id}" title="Edit SKU">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button class="btn-core btn-danger-outline btn-sm" style="padding: 0.2rem 0.45rem; font-size: 0.72rem;" data-action="delete-sku" data-id="${item.id}" title="Hapus SKU">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      `;
+
+      tr.querySelector('[data-action="edit-sku"]').addEventListener('click', () => {
+        this.openEditItemModal(item);
+      });
+
+      tr.querySelector('[data-action="delete-sku"]').addEventListener('click', () => {
+        this.handleDeleteItem(item.id);
+      });
+
+      tbody.appendChild(tr);
     });
   }
 

@@ -107,16 +107,18 @@
   - **CHECKER:** Khusus akses **Mobile Scanner** (penghitungan fisik rak BIN).
   - **AUDITOR / ACCOUNTING:** Khusus akses **Table Editor (View-only)** dan **Cetak Berita Acara**.
   - Tombol Logout di navbar dan di panel Pengaturan dengan konfirmasi SweetAlert2.
-- [x] **Panel Pengaturan Terbuka & Manajemen Dataset Dummy (`view-settings`):**
+- [x] **Panel Pengaturan & Full Master SKU CRUD Terpadu (`view-settings`):**
   - **Navigasi Permanen:** Tab Pengaturan selalu dapat diakses baik dari desktop top navbar maupun mobile bottom bar (`bnav-settings`).
   - **Card 1 (Sesi Pengguna & Otoritas):** Menampilkan profil pengguna aktif, status wewenang operasional, tombol Ganti Profil Sesi, dan tombol Logout.
-  - **Card 2 (Manajemen Data Item & Dataset Dummy):**
-    - Tombol Merah `Hapus Data Dummy (Kosongkan)` untuk membersihkan seluruh data (0 SKU) siap input opname aktual.
-    - Tombol Hijau `Set / Muat 20 Data Dummy SAP` untuk memuat ulang 20 item simulasi lengkap 4 skenario industri.
-    - Tombol Biru `Tambah SKU Baru Manual` (`modal-add-item`) untuk input data material baru tanpa import file.
-    - Penanganan Empty State ramah pengguna pada layar mobile checker dan desktop table.
-  - **Card 3 (Kustomisasi Tanda Tangan):** Form 4 penandatangan Berita Acara tanpa hardcode.
-  - **Card 4 (Profil Lembaga & Standar Audit):** Nama PT kop dokumen dan target akurasi stok IRA (%).
+  - **Card 2 (Manajemen Data Item, Dataset Dummy & CRUD Master SKU):**
+    - **Interactive CRUD Table:** Tabel master SKU langsung di Settings dengan fitur pencarian instan (`#settings-sku-search`), tombol **Edit SKU** dan tombol **Hapus SKU**.
+    - **Modal Edit SKU:** Dialog modal khusus (`#modal-edit-item`) untuk memperbarui data master SKU (BIN, Kode Material, Deskripsi, Batch SAP, Qty SAP, UOM, Exp Date) dengan sinkronisasi instan ke Supabase Cloud (`updateItemMaster`) & lokal.
+    - **Tambah SKU Baru:** Dialog modal (`#modal-add-item`) tersinkronisasi langsung ke Supabase Cloud (`createItem`).
+    - **Hapus SKU Spesifik:** Konfirmasi SweetAlert2 dengan penghapusan real-time di Supabase Cloud (`deleteItem`).
+    - **Hapus Semua / Kosongkan Data:** Mengosongkan tabel lokal dan cloud (`clearAllItems`).
+    - **Set / Muat 20 Data Dummy:** Mengunggah 20 dataset standar ke Supabase Cloud (`bulkUpsertItems`).
+  - **Card 3 (Kustomisasi Tanda Tangan) & Card 4 (Profil Lembaga):**
+    - Tombol "Simpan Pengaturan" terhubung langsung ke tabel `cc_settings` di Supabase Cloud via `syncSettings()` serta dimuat otomatis saat inisialisasi via `fetchSettings()`.
 - [x] **Pembersihan Modal Supabase di Frontend:**
   - Menghapus modal konfigurasi Supabase dari UI agar tidak membingungkan operator.
   - Koneksi database berjalan otomatis di latar belakang (*silent backend connection*).
